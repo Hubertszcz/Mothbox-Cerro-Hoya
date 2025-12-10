@@ -1,0 +1,435 @@
+#load packages
+library(lubridate)
+library(dplyr)
+library(tidyr)
+library(vegan)
+library(ggplot2)
+library(ggrepel)
+library(viridis)
+
+#Load data
+#all data CSVs from multiple sub folders:
+folder <- "C:/Users/Hubert/Desktop/Biodiversity Monitoring/Biodiversity data analysis/data input/mothbox/morphospecies"
+files <- list.files(path = folder, pattern = "\\.csv$", recursive = TRUE, full.names = TRUE)
+data <- do.call(rbind, lapply(files, read.csv))  # Read and combine in one step
+
+#alternate reality, just one night of PON045
+#data <- read.csv("C:/Users/Hubert/Desktop/Biodiversity Monitoring/Biodiversity data analysis/data input/mothbox/morphospecies/PON045/2025-04-10_ID_HS_morphospecies_exportdate_2025-09-08.csv")
+
+#metadata
+md1 <- read.csv("C:/Users/Hubert/Desktop/Biodiversity Monitoring/Biodiversity data analysis/data input/Azuero dry season/Azuero dry season deployments AZ001-053.csv")
+md2 <- read.csv("C:/Users/Hubert/Desktop/Biodiversity Monitoring/Biodiversity data analysis/data input/Ponterra/Ponterra deployments PON001-150.csv")
+
+
+#cleanup metadata dataframes and merge
+md1 <- md1[c(17,18,22,33),]         ### These are the points we care about (AZ017, AZ018, AZ022, AZ033)
+md2 <- md2[c(45),]                  ### This is the point we care about (PON045)
+md1 <- md1[c(1,7,9:11)]             ### These are the columns we care about (point, land_use, slope, aspect, elevation)
+md2 <- md2[c(1,7,9:11)]
+
+metadata <- rbind(md1, md2)
+
+#### remove rows without identifiers at any level (errors)
+data <- data[complete.cases(data[ , c('taxonID')]), ]
+
+#create a column with morphospecies or proper 'Genus species' (where available) names
+data <- data %>%
+  mutate(
+    name = case_when(
+      # If order is missing or blank, set to 'UnknownInsecta' - important for not losing things I couldn't ID to order
+      is.na(order) | order == "" ~ "UnknownInsecta",
+      
+      # If genus is missing (NA or empty string), use species
+      is.na(genus) | genus == "" ~ species,
+      
+      # If species contains any digit, use species
+      grepl("\\d", species) ~ species,
+      
+      # If both genus and species contain only letters, combine them
+      grepl("^[A-Za-z]+$", genus) & grepl("^[A-Za-z]+$", species) ~ paste(genus, species),
+      
+      # Otherwise just use species
+      TRUE ~ species
+    )
+  )
+
+#only keep columns we might care about (point, eventID (photo), deployment_name, eventDate, UTCOFFSET, taxonomy columns, name)
+data <- data[c(30,4,34,7,9,16:20,48)]    
+
+#correct point names (only want last 5 characters for true point name)
+data$point <- ifelse(
+  grepl("PON[0-9]+$", data$point), 
+  substr(data$point, nchar(data$point) - 5, nchar(data$point)),  # last 6 chars
+  substr(data$point, nchar(data$point) - 4, nchar(data$point))   # last 5 chars
+)
+
+#let's make sure that everything has a name
+dataB <- subset(data, name == "")
+#if there are rows in dataB, then go back and clean those up in fifty one
+
+
+### unique species and number of detections at one point
+#PON045 <- subset(data, point == "PON045",)          
+#morphospecies <- unique(PON045$name)
+
+
+##### convert eventTime to local hours
+
+# Parse to local time
+data <- data %>%
+  mutate(
+    eventDate_parsed = parse_date_time(eventDate, orders = "YmdHMSz", tz = "UTC"),
+    eventTime_local = with_tz(eventDate_parsed, tzone = "America/Panama"))
+
+#that didn't work, for some reason my eventTime_local is still UTC rather than 7pm Panama time.
+#and my parsed time eventDate is 10 hours ahead of real time...
+#I can tell because eventID (the photo name) has the correct time listed.
+#Something to figure out later... I'll manually subtract the UTC to have correct time
+
+# Subtract the UTC offset (in hours) from the time column
+data$localTime <- data$eventTime_local + hours(data$UTCOFFSET)
+
+
+##### remove rows that fell outside the desired time frame 
+# (getting rid of times the camera was on during programming for example)
+
+# Extract the hour and minute from the localTime column
+data <- data %>%
+  mutate(hour = hour(localTime), 
+         minute = minute(localTime))
+
+# Filter based on the specified time windows in the mothbox programA
+data <- data %>%
+  filter((hour == 19 & minute >= 0 & minute < 60) |
+           (hour == 21 & minute >= 0 & minute < 60) |
+           (hour == 23 & minute >= 0 & minute < 60) |
+           (hour == 2  & minute >= 0 & minute < 60) |
+           (hour == 4  & minute >= 0 & minute < 60))
+
+
+#########################################
+##that's it for initial cleanup
+#########################################
+
+
+#next up splitting the data up for two case studies:
+
+dataA <- subset(data, point == "PON045",)    #this data used for time of night case study
+dataB <- subset(data, point != "PON045",)    #this data used for land use case study
+
+##write these as CSV to sart from here in future:
+setwd("C:/Users/Hubert/Desktop/Biodiversity Monitoring/Biodiversity data analysis/data input/mothbox")
+
+write.csv(dataA, "dataA.csv", row.names = FALSE)
+write.csv(dataB, "dataB.csv", row.names = FALSE)
+
+
+
+######################################################################
+########### activity and richness with land use ######################
+######################################################################
+library(dplyr)
+library(tidyr)
+library(vegan)
+
+dataB <- read.csv("C:/Users/Hubert/Desktop/Biodiversity Monitoring/Biodiversity data analysis/data input/mothbox/dataB.csv")
+
+#calculating frequency
+dataC <- dataB %>%
+  group_by(point, name) %>%
+  summarise(freq = n(), .groups = "drop")
+
+#make point data wide for vegan package
+data_wide <- dataC %>% spread(key=name, value=freq)
+
+#replace NA values with 0:
+data_wide[is.na(data_wide)] <- 0
+
+#making dataframe of just counts:
+data_counts <- data_wide[,-c(1)]
+
+insect_activity <- rowSums(data_counts)           #Total activity (sum of unique observations/photo for all photos)
+insect_richness <- specnumber(data_counts)        #morphospecies richness 
+
+land_use <- c("teak", "teak", "reforestation", "mature")
+
+#dataframe for visualizations
+mothbox_data <- data_wide[,c(1)]
+mothbox_data$land_use <- land_use
+mothbox_data$insect_activity <- insect_activity
+mothbox_data$insect_richness <- insect_richness
+
+# average by land_use (this will average AZ017 and AZ018 because both are teak), and calculate standard error
+mothbox_summary <- mothbox_data %>%
+  group_by(land_use) %>%
+  summarise(
+    mean_insect_activity  = mean(insect_activity, na.rm = TRUE),
+    se_insect_activity    = sd(insect_activity, na.rm = TRUE) / sqrt(n()),
+    mean_insect_richness  = mean(insect_richness, na.rm = TRUE),
+    se_insect_richness    = sd(insect_richness, na.rm = TRUE) / sqrt(n()),
+    .groups = "drop"
+  )
+
+
+####################################################################################################
+## ANOVA for land use and detections/richness
+
+mothbox_data <- mothbox_data %>%
+  mutate(
+    forest_type = ifelse(land_use == "teak", "teak", "native")
+  )
+
+activity_aov <- aov(insect_activity ~ forest_type, data = mothbox_data)
+summary(activity_aov)
+
+richness_aov <- aov(insect_richness ~ forest_type, data = mothbox_data)
+summary(richness_aov)
+
+####################################################################################################
+
+
+
+setwd("C:/Users/Hubert/Desktop/Biodiversity Monitoring/Biodiversity data analysis/data input/mothbox")
+
+write.csv(mothbox_summary, "mothbox_summary.csv", row.names = FALSE)
+
+###########################################################################
+########### activity and richness with time of night ######################
+###########################################################################
+library(dplyr)
+library(tidyr)
+library(vegan)
+
+dataA <- read.csv("C:/Users/Hubert/Desktop/Biodiversity Monitoring/Biodiversity data analysis/data input/mothbox/dataA.csv")
+
+#first, I want to treat each night independently, so I need to make a column to designate night
+
+#first I'll standardize local time
+tz_local <- "America/Panama"
+
+dataA <- dataA %>%
+  mutate(
+    # Parse the localTime strings as local clock time in tz_local
+    localTime = as.POSIXct(localTime, format = "%Y-%m-%d %H:%M:%S", tz = tz_local),
+    
+    # Night label: same date for times >= 12:00:00, otherwise previous date
+    night = as.Date(localTime, tz = tz_local) - as.integer(hour(localTime) < 12)
+    
+    # If you prefer a character column: uncomment next line
+    # night = format(as.Date(localTime, tz = tz_local) - as.integer(hour(localTime) < 12), "%Y-%m-%d")
+  )
+
+### Richness through time, from when the light is first turned on:
+
+#I'll start by making a column for cumulative richness per hour
+dataA <- dataA %>%
+  # one identifier per hour window
+  mutate(session = floor_date(localTime, unit = "hour")) %>%
+  group_by(session) %>%
+  arrange(localTime, .by_group = TRUE) %>%           # ensure within-hour order
+  mutate(cumulativeRichness_hour = cumsum(!duplicated(name) & !is.na(name))) %>%
+  ungroup()
+
+#similar, but cumulative richness per night
+dataA$cumulativeRichness_night <- with(
+  dataA,
+  ave(name, night, FUN = function(x) cumsum(!duplicated(x) & !is.na(x)))
+)
+
+#Convert 'minute' to numeric for proper plotting
+dataA$minute <- as.numeric(dataA$minute)
+
+#Add':00' to each hour value
+dataA$hour <- paste(dataA$hour, "00", sep = ":")  
+
+# Ensure 'hour' is treated as a factor
+dataA$hour <- factor(dataA$hour)
+
+#Determine max minute to pad the x-axis
+max_minute <- max(dataA$minute)
+
+#add a column of just date
+dataA$date <- as.Date(dataA$localTime)
+
+### still issues with time zone!!! even if localTime shows the 10th, date shows the 11th. 
+
+#let's do this a different way:
+dataA$date <- substr(dataA$localTime, nchar(dataA$localTime) - 9, nchar(dataA$localTime))
+
+######### cumulative activity per hour
+dataA <- dataA %>%
+  group_by(eventID) %>%
+  mutate(detections_per_photo = n()) %>%
+  ungroup()
+
+
+#make sure everything is numeric
+dataA$cumulativeRichness_hour <- as.numeric(dataA$cumulativeRichness_hour)
+dataA$cumulativeRichness_night <- as.numeric(dataA$cumulativeRichness_night)
+dataA$detections_per_photo <- as.numeric(dataA$detections_per_photo)
+
+
+### adding 0-value rows to represent blank sheets at the start of each session
+
+# 1. Find one template row per session that *doesn't* already have minute == 0
+sessions_needing_zero <- dataA %>%
+  group_by(session) %>%
+  filter(!any(minute == 0)) %>%  # only sessions lacking a minute 0 row
+  slice(1) %>%                   # take the first row as a template
+  ungroup()
+
+# 2. Create the "zero" rows
+zeros <- sessions_needing_zero %>%
+  mutate(
+    minute                  = 0,
+    cumulativeRichness_hour = 0,
+    cumulativeRichness_night = 0,
+    detections_per_photo    = 0
+  )
+
+# 3. Give NA values to each value that was specific to the template rows
+cols_to_na <- c(2, 4, 6:14)
+zeros[, cols_to_na] <- NA
+
+# 4. Bind back and order so each session starts at minute 0
+dataA <- bind_rows(dataA, zeros) %>%
+  arrange(session, minute, localTime)
+
+
+######## Activity and richness across night
+
+#### decision point: do I average each night, or pool them together?
+#Better to average I think.
+
+#calculate total number of observations in hours (pooled across all nights, not doing this)
+#dataA <- dataA %>%
+#  group_by(hour) %>%
+#  mutate(cumulative_activity = n()) %>%
+#  ungroup()
+
+
+
+## ---- Average activity and richness per hour across nights ----
+
+avg_hour_summary <- dataA %>%
+  # 1) Work at the level of night × hour
+  group_by(night, hour) %>%
+  summarise(
+    # Number of detections in this night-hour
+    n_in_hour = n(),                              
+    # Species richness in this night-hour (unique "name" values)
+    richness  = n_distinct(name, na.rm = TRUE),   
+    .groups = "drop"
+  ) %>%
+  # 2) Collapse to one row per hour, averaging across nights
+  group_by(hour) %>%
+  summarise(
+    nights_counted = n(),                             # number of nights contributing to this hour
+    
+    # Mean detections per hour across nights
+    avg_activity   = mean(n_in_hour, na.rm = TRUE),
+    # Standard error of activity across nights
+    se_activity    = sd(n_in_hour,  na.rm = TRUE) / sqrt(nights_counted),
+    
+    # Mean richness per hour across nights
+    avg_richness   = mean(richness,  na.rm = TRUE),
+    # Standard error of richness across nights
+    se_richness    = sd(richness,   na.rm = TRUE) / sqrt(nights_counted),
+    
+    .groups = "drop"
+  )
+
+## ---- Create summary table for plotting ----
+
+activity_data <- avg_hour_summary %>%
+  # Keep only what you need for plotting/summary
+  select(hour,
+         avg_activity, se_activity,
+         avg_richness, se_richness,
+         nights_counted) %>%
+  distinct()  # one row per hour
+
+## ---- Relabel hours as time windows and control plotting order ----
+
+# These are the labels you want to appear on the x-axis, in order
+custom_order <- c("19:00 - 20:00",
+                  "21:00 - 22:00",
+                  "23:00 - 00:00",
+                  "02:00 - 03:00",
+                  "04:00 - 05:00")
+
+# Replace the raw hour values with these labels.
+# This assumes activity_data has 5 rows and they correspond to these windows.
+activity_data$hour <- custom_order
+
+# Make 'hour' an ordered factor so ggplot respects this order on the x-axis
+activity_data <- activity_data %>%
+  mutate(hour = factor(hour, levels = unique(hour)))
+
+
+
+################################################################################################################
+################################################################################################################
+
+#ANOVAs
+
+avg_hour_summary_raw <- dataA %>%
+  group_by(night, hour) %>%
+  summarise(
+    n_in_hour = n(),
+    richness  = n_distinct(name, na.rm = TRUE),
+    .groups = "drop")
+
+#does session (hour) affect activity?
+activity_aov <- aov(n_in_hour ~ hour, data = avg_hour_summary_raw)
+summary(activity_aov)
+
+#does session (hour) affect richness?
+richness_aov <- aov(richness ~ hour, data = avg_hour_summary_raw)
+summary(richness_aov)
+
+
+################################################################################################################
+################################################################################################################
+################################################################################################################
+################################################################################################################
+################################################################################################################
+################################################################################################################
+################################################################################################################
+################################################################################################################
+################################################################################################################
+################################################################################################################
+################################################################################################################
+################################################################################################################
+#For future, so I don't have to run full cleanup and preparation before visualization, here are cleanup products:
+setwd("C:/Users/Hubert/Desktop/Biodiversity Monitoring/Biodiversity data analysis/data input/mothbox")
+
+write.csv(mothbox_data, "mothbox_data.csv", row.names = FALSE)
+write.csv(dataA, "dataA.csv", row.names = FALSE)
+write.csv(activity_data, "activity_data.csv", row.names = FALSE)
+
+#read CSVs
+mothbox_data <- read.csv('C:/Users/Hubert/Desktop/Biodiversity Monitoring/Biodiversity data analysis/data input/mothbox/mothbox_data.csv')
+dataA <- read.csv('C:/Users/Hubert/Desktop/Biodiversity Monitoring/Biodiversity data analysis/data input/mothbox/dataA.csv')
+dataA <- read.csv('C:/Users/Hubert/Desktop/Biodiversity Monitoring/Biodiversity data analysis/data input/mothbox/dataA.csv')
+
+
+#Refer to 'mothbox figures' R script for visualization
+
+
+
+
+
+
+library(lubridate)
+data <- read.csv("C:/Users/Hubert/Desktop/Biodiversity Monitoring/Biodiversity data analysis/Data input/Mothbox/Mothbox_Main_Metadata_Field_Sheet_Example - Form responses 1.csv")
+
+a <- unique(data$site)     #unique deployment locations
+
+#number of nights
+data$collect_date <- dmy(data$collect_date)
+data$deployment_date <- dmy(data$deployment_date)
+data$nights <- data$collect_date - data$deployment_date
+data <- data[complete.cases(data$nights), ]
+
+sum(data$night)

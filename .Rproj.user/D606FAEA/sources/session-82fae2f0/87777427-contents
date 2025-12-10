@@ -1,0 +1,197 @@
+#load packages
+library(ggplot2)
+library(dplyr)
+library(viridis)
+
+
+#####################################################################
+################# Land use and forest type ##########################
+#####################################################################
+
+#Read data
+mothbox_data <- read.csv('C:/Users/Hubert/Desktop/Biodiversity Monitoring/Biodiversity data analysis/data input/mothbox/mothbox_summary.csv')
+
+setwd("C:/Users/Hubert/Desktop//Biodiversity Monitoring/Biodiversity data analysis/data output")
+
+# =========================================================
+# Figure 1: Detections and land use
+# =========================================================
+mothbox_data$land_use <- factor(
+  mothbox_data$land_use,
+  levels = c("teak", "reforestation", "mature"))
+
+
+p1 <- ggplot(mothbox_data, aes(x=land_use, y=mean_insect_activity, fill = land_use)) + 
+  geom_col(stat = "identity") +
+  scale_fill_viridis(discrete = TRUE, option = "viridis",direction = -1) +
+  labs(x = "Land use", y = "Total detections") +
+  theme_minimal(base_family = "Arial", base_size = 18) +
+  theme(
+    axis.title   = element_text(size = 38),
+    axis.text    = element_text(size = 28),
+    legend.position = "none"   # optional: remove legend (redundant with x-axis)
+  )
+
+png("Detections and land use.png",
+    width = 12, height = 7.5, units = "in", res = 300, bg = "white")
+print(p1)
+dev.off()
+
+# =========================================================
+# Figure 2: Richness and land use
+# =========================================================
+
+p2 <- ggplot(mothbox_data, aes(x=land_use, y=mean_insect_richness, fill = land_use)) + 
+  geom_col(stat = "identity") +
+  scale_fill_viridis(discrete = TRUE, option = "viridis",direction = -1) +
+  labs(x = "Land use", y = "Total richness") +
+  theme_minimal(base_family = "Arial", base_size = 18) +
+  theme(
+    axis.title   = element_text(size = 38),
+    axis.text    = element_text(size = 28),
+    legend.position = "none"   # optional: remove legend (redundant with x-axis)
+  )
+
+png("Richness and land use.png",
+    width = 12, height = 7.5, units = "in", res = 300, bg = "white")
+print(p2)
+dev.off()
+
+#####################################################################
+####################### Time of night ###############################
+#####################################################################
+#Read data
+dataA <- read.csv("C:/Users/Hubert/Desktop/Biodiversity Monitoring/Biodiversity data analysis/data input/mothbox/dataA.csv")
+activity_data <- read.csv("C:/Users/Hubert/Desktop/Biodiversity Monitoring/Biodiversity data analysis/data input/mothbox/activity_data.csv")
+
+setwd("C:/Users/Hubert/Desktop//Biodiversity Monitoring/Biodiversity data analysis/data output")
+
+
+# =========================================================
+# Figure 3: Richness per photo
+# =========================================================
+# ---- Order legend chronologically (across night) ----
+hrs <- unique(dataA$hour)
+hnum <- as.numeric(sub(":.*", "", hrs))
+hour_levels <- hrs[order((hnum - 18) %% 24)]   # starts at 18:00 / evening
+dataA$hour <- factor(dataA$hour, levels = hour_levels)
+
+# Order the hour labels chronologically across midnight for activity_data
+start_at <- 19
+
+levels_order <- activity_data %>%
+  distinct(hour) %>%
+  mutate(start_hour = as.numeric(sub("^\\s*(\\d{1,2}).*$", "\\1", hour))) %>%
+  arrange((start_hour - start_at) %% 24) %>%
+  pull(hour)
+
+activity_data$hour <- factor(activity_data$hour, levels = levels_order)
+
+
+plot_data_richness <- dataA %>%
+  group_by(hour, minute) %>%
+  summarise(cumulativeRichness_hour = mean(cumulativeRichness_hour, na.rm = TRUE))
+
+p3 <- ggplot(plot_data_richness, aes(x = minute, y = cumulativeRichness_hour, color = hour, group = hour)) +
+  geom_line(size = 2.2, lineend = "round") +
+  labs(x = "Minute", y = "Richness per photo", title = "", color = "Session") +
+  scale_x_continuous(breaks = seq(0, 60, by = 10)) +
+  scale_color_viridis(discrete = TRUE, option = "viridis") +
+    theme_minimal(base_family = "Arial", base_size = 18) +
+  theme(
+    axis.title   = element_text(size = 30),
+    axis.text    = element_text(size = 22),
+    legend.title = element_text(size = 26),
+    legend.text  = element_text(size = 22),
+    legend.position = c(0.12, .8)
+  )
+
+png("Cumulative richness.png",
+    width = 12, height = 7.5, units = "in", res = 300, bg = "white")
+print(p3)
+dev.off()
+
+# =========================================================
+# Figure 4: detections per photo by hour
+# =========================================================
+plot_data_detections <- dataA %>%
+  group_by(hour, minute) %>%
+  summarise(detections_per_photo = mean(detections_per_photo, na.rm = TRUE), .groups = "drop")
+
+p4 <- ggplot(plot_data_detections, aes(x = minute, y = detections_per_photo, color = hour, group = hour)) +
+  geom_line(size = 2.2, lineend = "round") +
+  labs(x = "Minute", y = "Detections per photo", title = "", color = "Session") +
+  scale_x_continuous(breaks = seq(0, 60, by = 10)) +
+  scale_color_viridis(discrete = TRUE, option = "viridis") +
+    theme_minimal(base_family = "Arial", base_size = 18) +
+  theme(
+    axis.title   = element_text(size = 30),
+    axis.text    = element_text(size = 22),
+    legend.title = element_text(size = 26),
+    legend.text  = element_text(size = 22),
+    legend.position = c(0.12, .8)
+  )
+
+png("detections per photo.png",
+    width = 12, height = 7.5, units = "in", res = 300, bg = "white")
+print(p4)
+dev.off()
+
+# =========================================================
+# Figure 5: Average detections per hour
+# =========================================================
+
+p5 <- ggplot(activity_data, aes(x = hour, y = avg_activity, fill = hour)) +
+  geom_col() +
+  geom_errorbar(
+    aes(
+      ymin = avg_activity - se_activity,
+      ymax = avg_activity + se_activity),
+    width = 0.1,           # width of the little horizontal bar at top
+    linewidth = 0.6  ) +      # optional: slightly thinner line
+  scale_fill_viridis(discrete = TRUE, option = "viridis") +
+  scale_x_discrete(labels = function(x) {
+    ifelse(seq_along(x) %% 2 == 0, paste0("\n\n", x), x)  # stagger labels
+  }) +
+  labs(title = "", x = "Session", y = "Mean total detections") +
+  theme_minimal(base_family = "Arial", base_size = 18) +
+  theme(
+    axis.title   = element_text(size = 30),
+    axis.text    = element_text(size = 22),
+    legend.position = "none"   # optional: remove legend (redundant with x-axis)
+  )
+
+png("Detections per hour.png",
+    width = 12, height = 7.5, units = "in", res = 300, bg = "white")
+print(p5)
+dev.off()
+
+# =========================================================
+# Figure 6: Average richness per hour
+# =========================================================
+
+p6 <- ggplot(activity_data, aes(x = hour, y = avg_richness, fill = hour)) +
+  geom_col() +
+  geom_errorbar(
+    aes(
+      ymin = avg_richness - se_richness,
+      ymax = avg_richness + se_richness),
+    width = 0.1,           # width of the little horizontal bar at top
+    linewidth = 0.6  ) +      # optional: slightly thinner line
+  scale_fill_viridis(discrete = TRUE, option = "viridis") +
+  scale_x_discrete(labels = function(x) {
+    ifelse(seq_along(x) %% 2 == 0, paste0("\n\n", x), x)  # stagger labels
+  }) +
+  labs(title = "", x = "Session", y = "Mean total richness") +
+  theme_minimal(base_family = "Arial", base_size = 18) +
+  theme(
+    axis.title   = element_text(size = 30),
+    axis.text    = element_text(size = 22),
+    legend.position = "none"   # optional: remove legend (redundant with x-axis)
+  )
+
+png("Richness per session.png",
+    width = 12, height = 7.5, units = "in", res = 300, bg = "white")
+print(p6)
+dev.off()
+
