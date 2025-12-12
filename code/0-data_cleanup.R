@@ -60,7 +60,16 @@ setequal(unique(data$deployment), unique(metadata$deployment))   #Check if deplo
 setdiff(unique(data$deployment), unique(metadata$deployment))    #Values in data$deployment but NOT in metadata$deployment
 setdiff(unique(metadata$deployment), unique(data$deployment))    #Values in metadata$deployment but NOT in data$deployment
 
-#looks like I'm missing data for the point at 202m elevation
+#looks like I'm missing data for the point at 202m elevation. In deployment notes: "DID NOT TAKE PHOTOS"
+
+
+## In our deployment notes for elevation 1416: "Was entirely discharged (no lights on anywhere) at collection. The epoxy for the lens was cracked. Perhaps overheated? 
+
+#it also got conspicuously almost no insects. I'm cutting it from the analysis
+
+data <- data[data$elevation != "1416", ]
+  
+# Need to think about what to do with elevation 1204. Deployment notes: "Corrupted images"  
 
 ###########################################################################################################################
 ###########################################################################################################################
