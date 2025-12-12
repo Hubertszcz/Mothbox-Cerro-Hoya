@@ -26,12 +26,25 @@ data$eventTime <- seconds_to_period(data$eventTime)
 data$eventTime <- sprintf("%02d:%02d:%02d", hour(data$eventTime), minute(data$eventTime), second(data$eventTime))
 data$eventDate <- parse_date_time(data$eventDate, orders = c("Ybd", "dmy", "mdy", "ymd"))
 
-#add elevation column to metadata
-metadata$elevation <- parse_number(metadata$site)
-
 #deplotment_name == deployment
 names(metadata)[names(metadata) == "deployment_name"] <- "deployment"
 
+#add 'site' column to data
+data <- data %>%
+  left_join(metadata %>% select(deployment, site), by = "deployment")
+
+#add elevation column to data
+data$elevation <- parse_number(data$site)
+
+#add 'night' column to data
+data <- data %>%
+  mutate(dt = ymd_hms(verbatimEventDate, quiet = TRUE),     # parse verbatimEventDate to POSIXct (ymd_hms)
+    night = as.Date(if_else(
+      hour(dt) < 5,          # times between 00:00 and 04:59 → previous date
+      dt - days(1), dt)))    # times 05:00–23:59 → same date
+
+#add 'site_night' column to data
+data$site_night <- paste(data$site, data$night, sep = "_")
 
 ###########################################################################################################################
 # tests to make sure everything is ok
@@ -47,7 +60,7 @@ setequal(unique(data$deployment), unique(metadata$deployment))   #Check if deplo
 setdiff(unique(data$deployment), unique(metadata$deployment))    #Values in data$deployment but NOT in metadata$deployment
 setdiff(unique(metadata$deployment), unique(data$deployment))    #Values in metadata$deployment but NOT in data$deployment
 
-#looks like I'm missing data for...
+#looks like I'm missing data for the point at 202m elevation
 
 ###########################################################################################################################
 ###########################################################################################################################
@@ -61,16 +74,15 @@ write.csv(metadata, "data_processed/metadata.csv", row.names = FALSE)
 # analysis that requires raw data
 ###########################################################################################################################
 
-
-#what percentage of detections were errors?
+#percentage of detections that were errors
 ((nrow(data_raw) - nrow(data))/nrow(data_raw))*100
 
-#what percentage did Mothbot think were errors?
+#percentage of detections that Mothbot thought were errors
 errors <- data_raw[grepl("ERROR", data_raw$original_mothbox_identifciation), ]
 
 (nrow(errors)/nrow(data_raw))*100
 
-## so errors Mothbot-identified as insects are still a significant issue
+# 0.68% vs the 21.96% that were actually errors
 
-
-
+## so errors Mothbot identified as insects are still a significant issue. 
+# AKA errors are under-represented in raw computer vision outputs.
