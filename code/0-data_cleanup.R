@@ -11,7 +11,7 @@ metadata <- read.csv("data_raw/mothbox_metadata.csv")
 
 #cleanup metadata
 metadata <- subset(metadata, project == "Hoya")    ### Only data from the Cerro Hoya expedition
-metadata <- metadata[c(21,2,7,8,9:14,17)]            ### Clean up some unnecessary columns
+metadata <- metadata[c(21,2,7,8,9:14,17)]          ### Clean up some unnecessary columns
 
 #clean data
 #remove rows with no taxonID (errors)
@@ -70,6 +70,17 @@ setdiff(unique(metadata$deployment), unique(data$deployment))    #Values in meta
 data <- data[data$elevation != "1416", ]
   
 # Need to think about what to do with elevation 1204. Deployment notes: "Corrupted images"  
+
+# Standardize taxonomic level for analysis:
+# - Non-Coleoptera: set name to order (analyze at order level).
+# - Coleoptera: keep finer taxonomy (do not change name).
+# - No order (e.g. only Insecta): leave name unchanged.
+data <- data %>%
+  mutate(
+    has_order = !is.na(order) & trimws(as.character(order)) != "",
+    name = if_else(has_order & order != "Coleoptera", as.character(order), name)
+  ) %>%
+  select(-has_order)
 
 ###########################################################################################################################
 ###########################################################################################################################

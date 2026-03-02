@@ -53,3 +53,4 @@ png("output/Richness and elevation.png",
     width = 12, height = 7.5, units = "in", res = 300, bg = "white")
 print(p1)
 dev.off()
+
