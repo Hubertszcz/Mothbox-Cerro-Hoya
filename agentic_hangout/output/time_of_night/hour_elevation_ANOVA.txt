@@ -1,0 +1,39 @@
+=== Elevation as FACTOR (aov: rate ~ hour * factor(elevation)) ===
+
+                  Df Sum Sq Mean Sq F value   Pr(>F)    
+hour               4 1319.1   329.8  71.542  < 2e-16 ***
+elevation_f       16 1179.7    73.7  15.995  < 2e-16 ***
+hour:elevation_f  64  700.5    10.9   2.374 1.05e-05 ***
+Residuals        143  659.2     4.6                     
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+=== Elevation as CONTINUOUS (lm: rate ~ hour * elevation) ===
+
+
+Call:
+lm(formula = rate ~ hour * elevation, data = session_rate)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-8.5568 -1.8843 -0.4506  1.5753 11.0582 
+
+Coefficients:
+                    Estimate Std. Error t value Pr(>|t|)    
+(Intercept)        1.494e+01  8.217e-01  18.181  < 2e-16 ***
+hour21h           -8.902e+00  1.179e+00  -7.550 1.18e-12 ***
+hour23h           -9.715e+00  1.178e+00  -8.249 1.51e-14 ***
+hour2h            -1.049e+01  1.170e+00  -8.967  < 2e-16 ***
+hour4h            -1.067e+01  1.193e+00  -8.937  < 2e-16 ***
+elevation         -7.173e-03  9.962e-04  -7.200 9.62e-12 ***
+hour21h:elevation  5.183e-03  1.431e-03   3.623 0.000362 ***
+hour23h:elevation  5.396e-03  1.420e-03   3.799 0.000188 ***
+hour2h:elevation   6.527e-03  1.412e-03   4.622 6.50e-06 ***
+hour4h:elevation   6.219e-03  1.452e-03   4.282 2.77e-05 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 3.023 on 218 degrees of freedom
+Multiple R-squared:  0.4837,	Adjusted R-squared:  0.4624 
+F-statistic:  22.7 on 9 and 218 DF,  p-value: < 2.2e-16
+
