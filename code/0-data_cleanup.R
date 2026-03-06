@@ -71,6 +71,10 @@ data <- data[data$elevation != "1416", ]
   
 # Need to think about what to do with elevation 1204. Deployment notes: "Corrupted images"  
 
+# Correct class for Order Araneae (spiders): they are Arachnida, not Insecta
+data <- data %>%
+  mutate(class = if_else(order == "Araneae", "Arachnida", as.character(class)))
+
 # Standardize taxonomic level for analysis:
 # - Non-Coleoptera: set name to order (analyze at order level).
 # - Coleoptera: keep finer taxonomy (do not change name).

@@ -33,8 +33,13 @@ order_hour_summary <- order_session %>%
     .groups = "drop"
   )
 
-# Plot: order x hour (detections per photo)
-p_order <- ggplot(order_hour_summary, aes(x = hour, y = mean_rate, fill = order)) +
+# Restrict to five focal orders for activity_by_order_and_hour figure
+focal_orders <- c("Hemiptera", "Lepidoptera", "Diptera", "Coleoptera", "Hymenoptera")
+order_hour_focal <- order_hour_summary %>% filter(order %in% focal_orders) %>%
+  mutate(order = factor(order, levels = focal_orders))
+
+# Plot: order x hour (detections per photo) — focal orders only
+p_order <- ggplot(order_hour_focal, aes(x = hour, y = mean_rate, fill = order)) +
   geom_col(position = "dodge") +
   geom_errorbar(aes(ymin = mean_rate - se_rate, ymax = mean_rate + se_rate),
                 position = position_dodge(width = 0.9), width = 0.2, linewidth = 0.5) +

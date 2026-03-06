@@ -96,6 +96,16 @@ summary(richness_aov)
 shannon_aov <- aov(insect_shannon ~ elevation, data = hoya_data)
 summary(shannon_aov)
 
+
+activity_paov <- adonis2(insect_activity ~ elevation, data = hoya_data, permutations = 999)
+summary(activity_paov)
+
+richness_paov <- adonis2(insect_richness ~ elevation, data = hoya_data, permutations = 999)
+summary(richness_paov)
+
+shannon_paov <- adonis2(insect_shannon ~ elevation, data = hoya_data, permutations = 999)
+summary(shannon_paov)
+
 # so that's good news...
 ###########################################################################################################################
 ###########################################################################################################################

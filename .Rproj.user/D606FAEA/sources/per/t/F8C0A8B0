@@ -3,7 +3,7 @@
     "path": "C:/Users/Hubert/Desktop/Biodiversity Monitoring/MothBox/Mothbox Github/Mothbox-Cerro-Hoya/code/1-data_analysis.R",
     "project_path": "code/1-data_analysis.R",
     "type": "r_source",
-    "hash": "0",
+    "hash": "1408444472",
     "contents": "",
     "dirty": false,
     "created": 1772246626271.0,
@@ -12,15 +12,15 @@
     "properties": {
         "source_window_id": "",
         "Source": "Source",
-        "cursorPosition": "210,0",
-        "scrollLine": "0"
+        "cursorPosition": "108,0",
+        "scrollLine": "87"
     },
     "folds": "",
-    "lastKnownWriteTime": 1772249626,
+    "lastKnownWriteTime": 1772785184,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1772249626304,
+    "last_content_update": 1772785184965,
     "read_only": false,
     "read_only_alternatives": []
 }
