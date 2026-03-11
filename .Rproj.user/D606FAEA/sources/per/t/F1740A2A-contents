@@ -5,7 +5,18 @@ library(dplyr)
 library(readr)
 
 #load data
-data_raw <- vroom(list.files("data_raw/occurence_data", pattern = "\\.csv$", full.names = TRUE),id = "source_file")
+# Force taxonomy/text columns as character so vroom does not guess logical when first chunks are empty
+# This was an issue which caused some values that were in the CSVs to not appear in data_raw 
+data_raw <- vroom(
+  list.files("data_raw/occurence_data", pattern = "\\.csv$", full.names = TRUE),
+  id = "source_file",
+  col_types = cols(
+    family = col_character(),
+    genus = col_character(),
+    species = col_character(),
+    commonName = col_character()
+  )
+)
 metadata <- read.csv("data_raw/mothbox_metadata.csv")
 
 
@@ -97,6 +108,13 @@ write.csv(metadata, "data_processed/metadata.csv", row.names = FALSE)
 ###########################################################################################################################
 # analysis that requires raw data
 ###########################################################################################################################
+
+unique <- unique(data[,14])                                                 #unique morphospecies
+   
+unique_coleoptera <- unique(data[data$order == "Coleoptera", 14])           #unique coleoptera species/morphospecies
+unique_coleoptera_family <- unique(data[data$order == "Coleoptera", 7])    #unique coleoptera families
+unique_coleoptera_genus <- unique(data[data$order == "Coleoptera", 8])     #unique coleoptera genera
+
 
 #percentage of detections that were errors
 ((nrow(data_raw) - nrow(data))/nrow(data_raw))*100
