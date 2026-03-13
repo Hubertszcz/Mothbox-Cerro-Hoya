@@ -9,17 +9,25 @@ alwaysApply: true
 - **Prefer R** and existing packages: `dplyr`, `vegan`, `ggplot2`, `viridis`, etc.
 - **Run from project root** so paths like `data_processed/` and `output/` work.
 
-- Style: “Use tidyverse-style R (dplyr, tidyr, etc.) where it fits. Prefer readable pipes and explicit column names; avoid obscure base-R tricks.”
-- Reproducibility: “Assume the working directory is the project root (e.g. RStudio with the .Rproj). Use relative paths from project root (e.g. data_processed/) or here::here() if adding new scripts; do not hardcode absolute paths.”
-- Pipeline order: “The pipeline is 0-data_cleanup.R → 1-data_analysis.R → 2-visualization.R. When changing an earlier script, note if later scripts depend on its outputs (column names, file names, filters) and keep them consistent.”
-- Raw data: “Never modify or overwrite files in data_raw/. Cleaning and filtering should only produce outputs in data_processed/ or elsewhere.”
-Approved scripts: “Do not edit code/0-data_cleanup.R, code/1-data_analysis.R, or code/2-visualization.R unless the user explicitly asks to change them. Propose new logic in scripts under agentic_hangout/ first.”
-- New/experimental: “New R scripts, experimental analyses, and AI-related docs go in agentic_hangout/. Only move or copy into code/ when the user approves.”
-- Outputs: “Figures and tables from scripts in agentic_hangout/ can go in agentic_hangout/output/ or a similarly named subfolder; do not overwrite output/ without being asked.”
-- Naming: “Name new scripts clearly (e.g. cleanup_validate_dates.R, analysis_order_level.R, viz_shannon_elevation.R) and keep a short comment at the top describing what the script does.”
-- Explain before big changes: “For non-trivial changes (new analyses, new pipeline steps, or refactors), briefly describe the plan before editing. For small edits (typos, one new plot), just do it.”
-- One concern per script when possible: “New scripts in agentic_hangout/ should focus on one concern (e.g. one new analysis or one new figure type) so they are easy to review and optionally merge into code/.”
-- Leave your decisions intact: “Do not remove or change exclusion rules (e.g. elevation 1416 m) or time windows (19h, 21h, 23h, 2h, 4h) unless the user asks. Note open decisions (e.g. 1204 m) in suggestions rather than changing them by default.”
-- Mothbox terms: “Use project terminology: deployment, site, site_night, elevation (from site name), occurrence/detection data, Mothbox metadata. Preserve column names like eventID, eventDate, eventTime, taxonID, name, site_night unless the user asks to rename.”
-- Science context: “This is biodiversity/insect monitoring data along an elevation gradient. Analyses and figures should be appropriate for ecological interpretation (e.g. richness, activity, diversity indices, elevation, time of night).”
-- In-code comments: “Add short comments for non-obvious steps (e.g. why a filter is applied, what a derived column means). Keep comments in sync with the code.”
+- Style: "Use tidyverse-style R (dplyr, tidyr, etc.) where it fits. Prefer readable pipes and explicit column names; avoid obscure base-R tricks."
+- Reproducibility: "Assume the working directory is the project root (e.g. RStudio with the .Rproj). Use relative paths from project root (e.g. data_processed/) or here::here() if adding new scripts; do not hardcode absolute paths."
+- Pipeline order: "The pipeline is 0-data_cleanup.R → 1-data_analysis.R → 2-visualization.R. When changing an earlier script, note if later scripts depend on its outputs (column names, file names, filters) and keep them consistent."
+- Raw data: "Never modify or overwrite files in data_raw/. Cleaning and filtering should only produce outputs in data_processed/ or elsewhere."
+- **Code added to `code/`**: When adding code to existing scripts in the `code/` folder, keep the addition as minimal as possible, do not change existing code, and bracket the added code before and after with this comment block (one block immediately before the first new line, one immediately after the last new line):
+  ```
+  ##################################
+  ##################################
+  ####### NEW ######################
+  ##################################
+  ##################################
+  ```
+Approved scripts: "Do not edit code/0-data_cleanup.R, code/1-data_analysis.R, or code/2-visualization.R unless the user explicitly asks to change them. Propose new logic in scripts under agentic_hangout/ first."
+- New/experimental: "New R scripts, experimental analyses, and AI-related docs go in agentic_hangout/. Only move or copy into code/ when the user approves."
+- Outputs: "Figures and tables from scripts in agentic_hangout/ can go in agentic_hangout/output/ or a similarly named subfolder; do not overwrite output/ without being asked."
+- Naming: "Name new scripts clearly (e.g. cleanup_validate_dates.R, analysis_order_level.R, viz_shannon_elevation.R) and keep a short comment at the top describing what the script does."
+- Explain before big changes: "For non-trivial changes (new analyses, new pipeline steps, or refactors), briefly describe the plan before editing. For small edits (typos, one new plot), just do it."
+- One concern per script when possible: "New scripts in agentic_hangout/ should focus on one concern (e.g. one new analysis or one new figure type) so they are easy to review and optionally merge into code/."
+- Leave your decisions intact: "Do not remove or change exclusion rules (e.g. elevation 1416 m) or time windows (19h, 21h, 23h, 2h, 4h) unless the user asks. Note open decisions (e.g. 1204 m) in suggestions rather than changing them by default."
+- Mothbox terms: "Use project terminology: deployment, site, site_night, elevation (from site name), occurrence/detection data, Mothbox metadata. Preserve column names like eventID, eventDate, eventTime, taxonID, name, site_night unless the user asks to rename."
+- Science context: "This is biodiversity/insect monitoring data along an elevation gradient. Analyses and figures should be appropriate for ecological interpretation (e.g. richness, activity, diversity indices, elevation, time of night)."
+- In-code comments: "Add short comments for non-obvious steps (e.g. why a filter is applied, what a derived column means). Keep comments in sync with the code."

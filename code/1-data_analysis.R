@@ -26,6 +26,24 @@ length(unique(data$name))
 
 ###########################################################################################################################
 ###########################################################################################################################
+# Calculating Session Effort (from total detections to detections per photo)
+###########################################################################################################################
+###########################################################################################################################
+
+data_for_effort <- data
+data_for_effort$hour_int <- as.integer(substr(data_for_effort$eventTime, 1, 2))
+data_for_effort <- data_for_effort %>% filter(hour_int %in% c(19, 21, 23, 2, 4))
+data_for_effort$hour <- factor(data_for_effort$hour_int, levels = c(19, 21, 23, 2, 4), labels = c("19h", "21h", "23h", "2h", "4h"))
+session_effort <- data_for_effort %>%
+  group_by(site_night, hour, hour_int) %>%
+  summarise(n_photos = n_distinct(eventID), elevation = first(elevation), .groups = "drop") %>%
+  select(site_night, hour, hour_int, elevation, n_photos)
+write.csv(session_effort, "data_processed/session_effort.csv", row.names = FALSE)
+
+
+
+###########################################################################################################################
+###########################################################################################################################
 # activity and richness per sampling point
 ###########################################################################################################################
 ###########################################################################################################################

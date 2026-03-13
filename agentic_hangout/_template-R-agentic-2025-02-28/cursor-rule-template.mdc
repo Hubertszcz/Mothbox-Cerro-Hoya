@@ -1,0 +1,25 @@
+---
+alwaysApply: true
+---
+# [Project name]
+
+- **Follow** [path to PROJECT_BRIEF, e.g. agentic_hangout/PROJECT_BRIEF.md] for project context, pipeline, and conventions.
+- **New scripts** and **AI-related docs** go in **`agentic_hangout/`**. **Outputs** from those scripts (CSVs, figures, tables) also go in **`agentic_hangout/`** (or e.g. `agentic_hangout/output/`)—never in main data/output folders unless the user explicitly approves.
+- **Approved edits** to the main pipeline go in **[Main script folder: code/ or scripts/]**.
+- Prefer **R and tidyverse-style libraries** where they fit; other analysis languages or tools (e.g. Python, notebooks) are also allowed in the main script folder.
+- Run from the **project root** so relative paths work.
+
+- **Protected folders:** Do not create, modify, or delete files in **`code/`**, **`data_raw/`**, **`data_processed/`**, **`output/`**, or **`.cursor/rules/`** unless the user explicitly asks you to. Propose changes in `agentic_hangout/` first; only touch these folders when the user approves.
+
+- Style: "Use tidyverse-style R (dplyr, tidyr, etc.) where it fits. Prefer readable pipes and explicit column names; avoid obscure base-R tricks."
+- Reproducibility: "Assume the working directory is the project root. Use relative paths from project root or `here::here()`; do not hardcode absolute paths."
+- R script startup: "At the start of any new R script (in `code/` or `agentic_hangout/`), ensure filepaths work regardless of run location: (1) if (basename(getwd()) %in% c(\"code\", \"agentic_hangout\")) setwd(\"..\"); (2) project_root <- getwd(); (3) use file.path(project_root, \"data_raw\", ...), file.path(project_root, \"output\", ...), etc. for all paths. Optionally check dir.exists(file.path(project_root, \"data_raw\")) and stop with a clear message if false."
+- Approved scripts: "Do not edit scripts in the main folder unless the user explicitly asks. Propose new logic in scripts under `agentic_hangout/` first."
+- New/experimental: "New R or other analysis scripts and AI-related docs go in `agentic_hangout/`. Only move or copy into the main script folder when the user approves."
+- Outputs: "Figures and tables from `agentic_hangout/` scripts go in `agentic_hangout/` or `agentic_hangout/output/`; do not overwrite main output folders without being asked."
+- Naming: "Name new scripts clearly and keep a short comment at the top describing what the script does."
+- Explain before big changes: "For non-trivial changes, briefly describe the plan before editing. For small edits, just do it."
+- One concern per script when possible: "New scripts in `agentic_hangout/` should focus on one concern so they are easy to review and optionally merge."
+- In-code comments: "Add short comments for non-obvious steps. Keep comments in sync with the code."
+
+> Note for future you: If you clone this project or repurpose this template, verify that the `PROJECT_BRIEF` path and `[Main script folder: code/ or scripts/]` placeholder in this rule are correct for the new project.
