@@ -122,6 +122,9 @@ unique_coleoptera <- unique(data[data$order == "Coleoptera", 14])           #uni
 unique_coleoptera_family <- unique(data[data$order == "Coleoptera", 7])    #unique coleoptera families
 unique_coleoptera_genus <- unique(data[data$order == "Coleoptera", 8])     #unique coleoptera genera
 
+#unique coleoptera at species level
+unique_coleoptera_species_level <- unique(data[data$order == "Coleoptera" & !is.na(data$species) & trimws(as.character(data$species)) != "", 9])   # unique Coleoptera identified at species level
+
 
 #percentage of detections that were errors
 ((nrow(data_raw) - nrow(data))/nrow(data_raw))*100

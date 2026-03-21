@@ -1,0 +1,271 @@
+#load packages
+library(dplyr)
+library(tidyr)
+
+#load data
+hoya_data <- read.csv("data_processed/hoya_data.csv")
+session_effort <- read.csv("data_processed/session_effort.csv")
+data <- read.csv("data_processed/data.csv")
+
+
+# =============================================================================
+# Setup:
+# =============================================================================
+
+# Exclude 1416 m for elevation analyses (match Fig 1, Fig 4)
+session_effort <- session_effort %>%
+  mutate(elevation_n = as.numeric(elevation)) %>%
+  filter(!is.na(elevation_n), elevation_n != 1416)
+hoya_data_elev <- hoya_data %>%
+  mutate(elevation_n = as.numeric(elevation)) %>%
+  filter(!is.na(elevation_n), elevation_n != 1416)
+
+# ProgramA hours and filter data to match visualization
+data <- data %>%
+  mutate(hour_int = as.integer(substr(as.character(eventTime), 1, 2))) %>%
+  filter(hour_int %in% c(19, 21, 23, 2, 4)) %>%
+  mutate(hour = factor(hour_int, levels = c(19, 21, 23, 2, 4), labels = c("19h", "21h", "23h", "2h", "4h")))
+data <- data %>% filter(as.numeric(elevation) != 1416)
+site_nights_ok <- unique(data$site_night)
+session_effort <- session_effort %>% filter(site_night %in% site_nights_ok)
+
+# Elevation bands for Test 6 (match Fig 4)
+elev_breaks <- c(0, 300, 600, 900, 1300, 2000)
+elev_labels <- c("<300 m", "300–600 m", "600–900 m", "900–1300 m", ">1300 m")
+session_effort <- session_effort %>%
+  mutate(elevation_band = cut(
+    elevation_n,
+    breaks = elev_breaks,
+    labels = elev_labels,
+    include.lowest = TRUE,
+    right = FALSE
+  ))
+
+focal_orders <- c("Lepidoptera", "Coleoptera", "Hemiptera", "Diptera")
+
+# =============================================================================
+# Data prep: rate for Fig 1 (site_night-level); session-level rate by order
+# =============================================================================
+
+# Site_night-level rate (mean detections per photo) for Test 1
+photos_per_site <- session_effort %>%
+  group_by(site_night) %>%
+  summarise(n_photos_total = sum(n_photos), .groups = "drop")
+fig1_data <- hoya_data_elev %>%
+  select(site_night, elevation, insect_activity) %>%
+  left_join(photos_per_site, by = "site_night") %>%
+  mutate(rate = insect_activity / n_photos_total)
+
+# Session-level rate by order for Tests 5 and 6 (site_night x hour x order)
+session_rates_by_order <- function(detections_df, order_name) {
+  counts <- detections_df %>%
+    group_by(site_night, hour) %>%
+    summarise(detections = n(), .groups = "drop")
+  session_effort %>%
+    select(site_night, hour, n_photos, elevation, elevation_n, elevation_band) %>%
+    left_join(counts, by = c("site_night", "hour")) %>%
+    mutate(
+      detections = replace_na(detections, 0L),
+      rate = detections / n_photos,
+      order = order_name
+    )
+}
+rates_session_lepi   <- session_rates_by_order(data %>% filter(order == "Lepidoptera"), "Lepidoptera")
+rates_session_coleo  <- session_rates_by_order(data %>% filter(order == "Coleoptera"), "Coleoptera")
+rates_session_hemi   <- session_rates_by_order(data %>% filter(order == "Hemiptera"), "Hemiptera")
+rates_session_dip    <- session_rates_by_order(data %>% filter(order == "Diptera"), "Diptera")
+rates_session_long   <- bind_rows(
+  rates_session_lepi, rates_session_coleo, rates_session_hemi, rates_session_dip
+)
+
+# Site_night-level rate per order for Test 4 (detections / n_photos_total per site_night)
+order_detections_sitenight <- data %>%
+  filter(order %in% focal_orders) %>%
+  group_by(site_night, order) %>%
+  summarise(detections = n(), .groups = "drop")
+fig4_order_data <- photos_per_site %>%
+  left_join(
+    order_detections_sitenight,
+    by = "site_night"
+  ) %>%
+  left_join(
+    session_effort %>% select(site_night, elevation, elevation_n) %>% distinct(site_night, .keep_all = TRUE),
+    by = "site_night"
+  ) %>%
+  mutate(
+    detections = replace_na(detections, 0L),
+    rate = detections / n_photos_total
+  )
+
+# =============================================================================
+# Test 1: Mean detections per photo ~ elevation (Figure 1)
+# =============================================================================
+
+m1 <- lm(rate ~ factor(elevation), data = fig1_data)
+aov1 <- anova(m1)
+p1 <- aov1["factor(elevation)", "Pr(>F)"]
+f1 <- aov1["factor(elevation)", "F value"]
+sig1 <- if (p1 < 0.05) "was" else "was not"
+result_1 <- sprintf(
+  "Elevation %s a significant predictor of mean detections per photo (ANOVA, F = %.3f, p = %s).",
+  sig1, f1, format.pval(p1, digits = 2)
+)
+
+# =============================================================================
+# Test 2: Total richness ~ elevation (Figure 2)
+# =============================================================================
+
+m2 <- lm(insect_richness ~ factor(elevation), data = hoya_data_elev)
+aov2 <- anova(m2)
+p2 <- aov2["factor(elevation)", "Pr(>F)"]
+f2 <- aov2["factor(elevation)", "F value"]
+sig2 <- if (p2 < 0.05) "was" else "was not"
+result_2 <- sprintf(
+  "Elevation %s a significant predictor of total richness (ANOVA, F = %.3f, p = %s).",
+  sig2, f2, format.pval(p2, digits = 2)
+)
+
+# =============================================================================
+# Test 3: Shannon diversity ~ elevation (Figure 3)
+# =============================================================================
+
+m3 <- lm(insect_shannon ~ factor(elevation), data = hoya_data_elev)
+aov3 <- anova(m3)
+p3 <- aov3["factor(elevation)", "Pr(>F)"]
+f3 <- aov3["factor(elevation)", "F value"]
+sig3 <- if (p3 < 0.05) "was" else "was not"
+result_3 <- sprintf(
+  "Elevation %s a significant predictor of Shannon diversity (ANOVA, F = %.3f, p = %s).",
+  sig3, f3, format.pval(p3, digits = 2)
+)
+
+# =============================================================================
+# Test 4: Total detections per order (rate) ~ elevation (focal orders)
+# =============================================================================
+
+result_4 <- character(length(focal_orders))
+names(result_4) <- focal_orders
+for (ord in focal_orders) {
+  df4 <- fig4_order_data %>% filter(order == ord)
+  m4 <- lm(rate ~ factor(elevation), data = df4)
+  aov4 <- anova(m4)
+  p4 <- aov4["factor(elevation)", "Pr(>F)"]
+  f4 <- aov4["factor(elevation)", "F value"]
+  sig4 <- if (p4 < 0.05) "was" else "was not"
+  result_4[ord] <- sprintf(
+    "Elevation %s a significant predictor of %s detections per photo (ANOVA, F = %.3f, p = %s).",
+    sig4, ord, f4, format.pval(p4, digits = 2)
+  )
+}
+
+# =============================================================================
+# Test 5: Effect of session on detections per photo (focal orders)
+# =============================================================================
+
+result_5 <- character(length(focal_orders))
+names(result_5) <- focal_orders
+for (ord in focal_orders) {
+  df5 <- rates_session_long %>% filter(order == ord)
+  m5 <- lm(rate ~ hour, data = df5)
+  aov5 <- anova(m5)
+  p5 <- aov5["hour", "Pr(>F)"]
+  f5 <- aov5["hour", "F value"]
+  sig5 <- if (p5 < 0.05) "was" else "was not"
+  result_5[ord] <- sprintf(
+    "Session %s a significant predictor of %s detections per photo (ANOVA, F = %.3f, p = %s).",
+    sig5, ord, f5, format.pval(p5, digits = 2)
+  )
+}
+
+# =============================================================================
+# Test 6: Effect of session and elevation on detections per photo (focal orders)
+# =============================================================================
+
+result_6 <- character(length(focal_orders))
+names(result_6) <- focal_orders
+for (ord in focal_orders) {
+  df6 <- rates_session_long %>% filter(order == ord)
+  m6 <- lm(rate ~ hour * elevation_band, data = df6)
+  aov6 <- anova(m6)
+  p_hour6   <- aov6["hour", "Pr(>F)"]
+  p_elev6   <- aov6["elevation_band", "Pr(>F)"]
+  p_int6    <- aov6["hour:elevation_band", "Pr(>F)"]
+  sig_hour  <- if (p_hour6 < 0.05) "significant" else "not significant"
+  sig_elev  <- if (p_elev6 < 0.05) "significant" else "not significant"
+  sig_int   <- if (p_int6 < 0.05) "significant" else "not significant"
+  result_6[ord] <- sprintf(
+    "%s: session %s (p = %s), elevation band %s (p = %s), interaction %s (p = %s).",
+    ord, sig_hour, format.pval(p_hour6, digits = 2),
+    sig_elev, format.pval(p_elev6, digits = 2),
+    sig_int, format.pval(p_int6, digits = 2)
+  )
+}
+
+# =============================================================================
+# Results summary: one-line statements
+# =============================================================================
+
+results_df <- tibble(
+  test = c(
+    "1_mean_detections_per_photo_elevation",
+    "2_richness_elevation",
+    "3_shannon_elevation",
+    paste0("4_order_", focal_orders, "_elevation"),
+    paste0("5_session_", focal_orders),
+    paste0("6_session_x_elevation_", focal_orders)
+  ),
+  statement = c(
+    result_1,
+    result_2,
+    result_3,
+    result_4[focal_orders],
+    result_5[focal_orders],
+    result_6[focal_orders]
+  )
+)
+
+cat("\n========== Statistical results (one-line statements) ==========\n\n")
+cat(result_1, "\n")
+cat(result_2, "\n")
+cat(result_3, "\n\n")
+cat("Per order (elevation):\n")
+for (ord in focal_orders) cat("  ", result_4[ord], "\n")
+cat("\nPer order (session):\n")
+for (ord in focal_orders) cat("  ", result_5[ord], "\n")
+cat("\nPer order (session x elevation):\n")
+for (ord in focal_orders) cat("  ", result_6[ord], "\n")
+cat("\n================================================================\n")
+
+# Optionally save results table (project rule: agentic outputs in agentic_hangout)
+dir.create("agentic_hangout/output", showWarnings = FALSE, recursive = TRUE)
+write.csv(results_df, "agentic_hangout/output/statistics_one_line_results.csv", row.names = FALSE)
+
+###########################################################################################################################
+### OLD: initial trials with getting at significance (kept for reference)
+###########################################################################################################################
+
+#load packages
+# library(vegan)
+# library(dplyr)
+# library(tidyr)
+
+#load data
+# hoya_data <- read.csv("data_processed/hoya_data.csv")
+
+# ANOVA for elevation and detections/richness
+# activity_aov <- aov(insect_activity ~ elevation, data = hoya_data)
+# summary(activity_aov)
+
+# richness_aov <- aov(insect_richness ~ elevation, data = hoya_data)
+# summary(richness_aov)
+
+# shannon_aov <- aov(insect_shannon ~ elevation, data = hoya_data)
+# summary(shannon_aov)
+
+# adonis2 is for multivariate/distance matrices; not appropriate for univariate responses — dropped
+# activity_paov <- adonis2(insect_activity ~ elevation, data = hoya_data, permutations = 999)
+# summary(activity_paov)
+# richness_paov <- adonis2(insect_richness ~ elevation, data = hoya_data, permutations = 999)
+# summary(richness_paov)
+# shannon_paov <- adonis2(insect_shannon ~ elevation, data = hoya_data, permutations = 999)
+# summary(shannon_paov)
