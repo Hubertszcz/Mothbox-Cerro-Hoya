@@ -74,28 +74,23 @@ family_summaries <- family_site_data %>%
   }) %>%
   ungroup()
 
-# ANOVA p-value per family per metric (for plot annotations)
-pval_annot <- function(pval) {
-  label <- if (is.na(pval)) "p = NA" else if (pval < 0.001) "p < 0.001" else sprintf("p = %.3f", pval)
-  list(label = label, fontface = if (!is.na(pval) && pval < 0.05) "bold" else "plain")
-}
+# GLMM/LMM p-values per family (from elevation_glmm/analysis_elevation_statistics.R)
+source("agentic_hangout/elevation_glmm/R/stats_annotations.R")
+annot_all <- read_plot_annotations()
+
 pval_by_family <- function(metric) {
   fams <- unique(family_site_data$family)
   tibble(
     family = fams,
-    pval = vapply(fams, function(f) {
-      d <- filter(family_site_data, family == f)
-      m <- tryCatch(aov(as.formula(paste(metric, "~ elevation")), data = d), error = function(e) NULL)
-      if (is.null(m)) NA_real_ else summary(m)[[1]]["elevation", "Pr(>F)"]
-    }, FUN.VALUE = numeric(1))
-  ) %>%
-    rowwise() %>%
-    mutate(
-      label = pval_annot(pval)$label,
-      fontface = pval_annot(pval)$fontface
-    ) %>%
-    ungroup() %>%
-    select(family, label, fontface)
+    label = vapply(fams, function(f) {
+      test_id <- paste0("coleoptera_family_", f, "_", metric)
+      get_plot_annot(test_id, annot_all)$label
+    }, FUN.VALUE = character(1)),
+    fontface = vapply(fams, function(f) {
+      test_id <- paste0("coleoptera_family_", f, "_", metric)
+      get_plot_annot(test_id, annot_all)$fontface
+    }, FUN.VALUE = character(1))
+  )
 }
 pval_activity <- pval_by_family("activity")
 pval_richness <- pval_by_family("richness")

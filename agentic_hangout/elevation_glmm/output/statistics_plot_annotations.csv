@@ -1,0 +1,8 @@
+"test","p_value","label","fontface"
+"activity_per_photo_elevation",0.0321467962911009,"p = 0.032","bold"
+"2_richness_elevation",0.0354872010505714,"p = 0.035","bold"
+"3_shannon_elevation",0.000276387741949243,"p < 0.001","bold"
+"4_order_Lepidoptera_elevation",0.738040412564561,"p = 0.738","plain"
+"4_order_Coleoptera_elevation",0.000321112414630873,"p < 0.001","bold"
+"4_order_Hemiptera_elevation",0.0199246331258605,"p = 0.020","bold"
+"4_order_Diptera_elevation",0.369899957726514,"p = 0.370","plain"

@@ -236,6 +236,12 @@ png("output/activity_by_session_and_elevation_bands.png",
 print(p4)
 dev.off()
 
+
+tiff("output/activity_by_session_and_elevation_bands.tif",
+     width = 10, height = 9.5, units = "in", res = 300, compression = "lzw", bg = "white")
+print(p4)
+dev.off()
+
 # =========================================================
 # Figure 5: Activity by order and hour (four focal orders + Other orders)
 # =========================================================
@@ -268,11 +274,28 @@ p_order <- ggplot(order_hour_focal, aes(x = hour, y = mean_rate, fill = order_di
   theme(axis.title = element_text(size = 30),
         axis.text = element_text(size = 20),
         axis.text.x = element_text(angle = 0),
-        legend.position = "right")
+        legend.position = c(0.98, 0.98),
+        legend.justification = c(1, 1),
+        legend.background = element_rect(fill = "white", color = NA))
 
 png("output/activity_by_order_and_hour.png", width = 12, height = 6, units = "in", res = 300, bg = "white")
 print(p_order)
 dev.off()
+
+##################################
+##################################
+####### NEW ######################
+##################################
+##################################
+tiff("output/activity_by_order_and_hour.tif",
+     width = 12, height = 6, units = "in", res = 300, compression = "lzw", bg = "white")
+print(p_order)
+dev.off()
+##################################
+##################################
+####### NEW ######################
+##################################
+##################################
 
 # =========================================================
 # Figure 6: Activity by hour and elevation (factor)
@@ -304,8 +327,169 @@ p_factor <- ggplot(summary_factor, aes(x = hour, y = mean_rate, group = 1)) +
 png("output/activity_by_hour_and_elevation_factor.png", width = 14, height = 8, units = "in", res = 300, bg = "white")
 print(p_factor)
 dev.off()
+
 ##################################
 ##################################
 ####### NEW ######################
 ##################################
 ##################################
+
+# Figure 6 overlay: activity by time of night across elevation (reads outputs from 3-statistics.R)
+if (!file.exists("data_processed/activity_by_hour_lmm_predictions.csv")) {
+  stop("Run code/3-statistics.R before Figure 6 overlay (missing activity_by_hour_lmm_predictions.csv).")
+}
+session_rate_fig6 <- read.csv("data_processed/activity_by_hour_session_rate.csv")
+elev_hour_means_fig6 <- read.csv("data_processed/activity_by_hour_elevation_summary.csv")
+pred_fig6_hour <- read.csv("data_processed/activity_by_hour_lmm_predictions.csv")
+hour_levels_fig6 <- c("19h", "21h", "23h", "2h", "4h")
+session_rate_fig6$hour <- factor(session_rate_fig6$hour, levels = hour_levels_fig6)
+elev_hour_means_fig6$hour <- factor(elev_hour_means_fig6$hour, levels = hour_levels_fig6)
+pred_fig6_hour$hour <- factor(pred_fig6_hour$hour, levels = hour_levels_fig6)
+
+p_factor_overlay <- ggplot(session_rate_fig6, aes(x = hour, y = rate, colour = elevation_n)) +
+  geom_point(size = 1.8, alpha = 0.4) +
+  geom_line(
+    data = elev_hour_means_fig6,
+    aes(x = hour, y = mean_rate, colour = elevation_n, group = factor(elevation_n)),
+    linewidth = 0.5,
+    alpha = 0.85
+  ) +
+  geom_ribbon(
+    data = pred_fig6_hour,
+    aes(x = hour, ymin = ymin, ymax = ymax, group = 1),
+    inherit.aes = FALSE,
+    fill = "grey40",
+    alpha = 0.2
+  ) +
+  geom_line(
+    data = pred_fig6_hour,
+    aes(x = hour, y = fit, group = 1),
+    inherit.aes = FALSE,
+    colour = "black",
+    linewidth = 1.3
+  ) +
+  scale_colour_viridis_c(option = "viridis", direction = -1, name = "Elevation (m)") +
+  labs(x = "Time of night", y = "Mean detections per photo") +
+  theme_minimal(base_family = "Arial", base_size = 18) +
+  theme(
+    axis.title = element_text(size = 30),
+    axis.text = element_text(size = 20),
+    legend.title = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    legend.position = c(0.98, 0.98),
+    legend.justification = c(1, 1),
+    legend.background = element_rect(fill = "white", colour = NA)
+  )
+
+png("output/activity_by_hour_and_elevation_factor_overlay.png",
+  width = 12, height = 7.5, units = "in", res = 300, bg = "white")
+print(p_factor_overlay)
+dev.off()
+
+tiff("output/activity_by_hour_and_elevation_factor_overlay.tif",
+  width = 12, height = 7.5, units = "in", res = 300, compression = "lzw", bg = "white")
+print(p_factor_overlay)
+dev.off()
+
+##################################
+##################################
+####### NEW ######################
+##################################
+##################################
+
+# Continuous elevation GLMM/LMM figures (site-night points; matches code/3-statistics.R)
+library(glmmTMB)
+library(lme4)
+library(lmerTest)
+source("agentic_hangout/new_plots/R/elevation_model_helpers.R")
+
+elev_axis_breaks <- seq(200, 1400, by = 200)
+
+plot_data_elev <- hoya_data %>%
+  mutate(
+    elevation_n = as.numeric(elevation),
+    site = sub("_.*", "", site_night)
+  ) %>%
+  filter(!is.na(elevation_n), elevation_n != 1416) %>%
+  left_join(photos_per_site, by = "site_night") %>%
+  mutate(
+    rate = insect_activity / n_photos_total,
+    log_offset = log(n_photos_total)
+  ) %>%
+  filter(n_photos_total > 0)
+
+save_elevation_glm_plot <- function(df_points, y_col, pred_df, ylab, outfile, show_x_axis = FALSE) {
+  p <- ggplot(df_points, aes(x = elevation_n, y = .data[[y_col]], colour = elevation_n)) +
+    geom_point(size = 3, alpha = 0.85) +
+    scale_color_viridis(option = "viridis", direction = -1) +
+    scale_x_continuous(breaks = elev_axis_breaks) +
+    labs(x = if (show_x_axis) "Elevation (m)" else NULL, y = ylab) +
+    base_theme_elevation() +
+    theme(
+      axis.title.x = if (show_x_axis) element_text(size = 30) else element_blank(),
+      axis.text.x  = if (show_x_axis) element_text(size = 20) else element_blank(),
+      axis.ticks.x = if (show_x_axis) element_line() else element_blank()
+    )
+
+  if (!is.null(pred_df) && nrow(pred_df) > 0) {
+    if (isTRUE(pred_df$has_ribbon[1])) {
+      p <- p +
+        geom_ribbon(
+          data = pred_df,
+          aes(x = elevation_n, ymin = ymin, ymax = ymax),
+          inherit.aes = FALSE,
+          fill = "grey40", alpha = 0.15
+        )
+    }
+    p <- p +
+      geom_line(
+        data = pred_df,
+        aes(x = elevation_n, y = fit),
+        inherit.aes = FALSE,
+        linewidth = 1.1,
+        colour = "black"
+      )
+  }
+
+  png(outfile, width = 12, height = 7.5, units = "in", res = 300, bg = "white")
+  print(p)
+  dev.off()
+}
+
+fit_rate_elev <- fit_count_glmm(plot_data_elev, "insect_activity", use_offset = TRUE)
+pred_rate_elev <- predict_count_glmm(fit_rate_elev, plot_data_elev, to_rate = TRUE)
+save_elevation_glm_plot(
+  df_points = plot_data_elev,
+  y_col = "rate",
+  pred_df = pred_rate_elev,
+  ylab = "Mean detections per photo",
+  outfile = "output/Detections_and_elevation_continuous.png"
+)
+
+fit_rich_elev <- fit_count_glmm(plot_data_elev, "insect_richness", use_offset = TRUE)
+pred_rich_elev <- predict_count_glmm(fit_rich_elev, plot_data_elev, to_rate = FALSE)
+save_elevation_glm_plot(
+  df_points = plot_data_elev,
+  y_col = "insect_richness",
+  pred_df = pred_rich_elev,
+  ylab = "Richness",
+  outfile = "output/Richness_and_elevation_continuous.png"
+)
+
+fit_shan_elev <- fit_shannon_lmm(plot_data_elev)
+pred_shan_elev <- predict_shannon_lmm(fit_shan_elev, plot_data_elev)
+save_elevation_glm_plot(
+  df_points = plot_data_elev,
+  y_col = "insect_shannon",
+  pred_df = pred_shan_elev,
+  ylab = "Shannon diversity",
+  outfile = "output/Shannon_and_elevation_continuous.png",
+  show_x_axis = TRUE
+)
+
+##################################
+##################################
+####### NEW ######################
+##################################
+##################################
+

@@ -1,0 +1,44 @@
+Linear mixed model fit by REML. t-tests use Satterthwaite's method [
+lmerModLmerTest]
+Formula: rate ~ hour * elevation_n + (1 | site) + (1 | site_night)
+   Data: session_all
+
+REML criterion at convergence: 1115.8
+
+Scaled residuals: 
+    Min      1Q  Median      3Q     Max 
+-2.9324 -0.4428 -0.0211  0.3322  4.2733 
+
+Random effects:
+ Groups     Name        Variance Std.Dev.
+ site_night (Intercept) 0.9489   0.9741  
+ site       (Intercept) 3.9516   1.9879  
+ Residual               4.7424   2.1777  
+Number of obs: 228, groups:  site_night, 47; site, 17
+
+Fixed effects:
+                      Estimate Std. Error         df t value Pr(>|t|)    
+(Intercept)          14.788972   1.122193  23.632438  13.179 2.22e-12 ***
+hour21h              -8.732212   0.851133 173.055785 -10.260  < 2e-16 ***
+hour23h              -9.647702   0.850093 172.978813 -11.349  < 2e-16 ***
+hour2h              -10.537774   0.843531 172.693849 -12.492  < 2e-16 ***
+hour4h              -10.790071   0.863143 174.027345 -12.501  < 2e-16 ***
+elevation_n          -0.006786   0.001309  25.737366  -5.183 2.14e-05 ***
+hour21h:elevation_n   0.004920   0.001033 173.138450   4.763 4.01e-06 ***
+hour23h:elevation_n   0.005332   0.001024 172.631663   5.205 5.45e-07 ***
+hour2h:elevation_n    0.006563   0.001018 172.309285   6.449 1.10e-09 ***
+hour4h:elevation_n    0.006487   0.001051 174.064454   6.172 4.60e-09 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Correlation of Fixed Effects:
+            (Intr) hor21h hor23h hour2h hour4h elvtn_ hr21:_ hr23:_ hr2h:_
+hour21h     -0.367                                                        
+hour23h     -0.368  0.485                                                 
+hour2h      -0.370  0.488  0.489                                          
+hour4h      -0.362  0.477  0.478  0.483                                   
+elevation_n -0.847  0.322  0.322  0.325  0.317                            
+hr21h:lvtn_  0.310 -0.845 -0.409 -0.411 -0.402 -0.382                     
+hr23h:lvtn_  0.312 -0.412 -0.847 -0.415 -0.406 -0.384  0.487              
+hr2h:lvtn_n  0.314 -0.414 -0.414 -0.844 -0.409 -0.387  0.490  0.494       
+hr4h:lvtn_n  0.303 -0.401 -0.402 -0.406 -0.848 -0.373  0.474  0.479  0.482

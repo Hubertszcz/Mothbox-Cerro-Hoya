@@ -88,23 +88,16 @@ base_theme <- function() {
 }
 stagger_x <- function(x) ifelse(seq_along(x) %% 2 == 0, paste0("\n\n", x), x)
 
-# Format p-value for display; return list(label, fontface)
-pval_annot <- function(pval) {
-  label <- if (pval < 0.001) "p < 0.001" else sprintf("p = %.3f", pval)
-  list(label = label, fontface = if (pval < 0.05) "bold" else "plain")
-}
-
-# ANOVA: elevation effect
-aov_shannon <- summary(aov(insect_shannon ~ elevation, data = hoya_data))[[1]]
-aov_simpson <- summary(aov(insect_simpson ~ elevation, data = hoya_data))[[1]]
-p_shannon_val <- aov_shannon["elevation", "Pr(>F)"]
-p_simpson_val <- aov_simpson["elevation", "Pr(>F)"]
-ann_shannon <- pval_annot(p_shannon_val)
-ann_simpson <- pval_annot(p_simpson_val)
+# GLMM/LMM p-values from continuous-elevation analysis (run elevation_glmm/analysis_elevation_statistics.R first)
+source("agentic_hangout/elevation_glmm/R/stats_annotations.R")
+ann_rate <- get_plot_annot("activity_per_photo_elevation")
+ann_shannon <- get_plot_annot("3_shannon_elevation")
+ann_simpson <- get_plot_annot("simpson_elevation")
+ann_rare_rich <- get_plot_annot("insect_richness_rare_elevation")
+ann_rare_shan <- get_plot_annot("insect_shannon_rare_elevation")
+ann_rare_sim <- get_plot_annot("insect_simpson_rare_elevation")
 
 # Figure: Activity per photo vs elevation
-aov_rate <- summary(aov(activity_per_photo ~ elevation, data = hoya_data))[[1]]
-ann_rate <- pval_annot(aov_rate["elevation", "Pr(>F)"])
 p_rate <- ggplot(hoya_summary, aes(x = factor(elevation), y = mean_activity_per_photo, fill = factor(elevation))) +
   geom_col() +
   geom_errorbar(aes(ymin = mean_activity_per_photo - se_activity_per_photo, ymax = mean_activity_per_photo + se_activity_per_photo), width = 0.1, linewidth = 0.6) +
@@ -119,8 +112,6 @@ dev.off()
 message("Written: ", file.path(dir_out, "Activity_per_photo_and_elevation.png"))
 
 # Figure: Rarefied richness vs elevation
-aov_rare_rich <- summary(aov(insect_richness_rare ~ elevation, data = hoya_data))[[1]]
-ann_rare_rich <- pval_annot(aov_rare_rich["elevation", "Pr(>F)"])
 p_rare_rich <- ggplot(hoya_summary, aes(x = factor(elevation), y = mean_richness_rare, fill = factor(elevation))) +
   geom_col() +
   geom_errorbar(aes(ymin = mean_richness_rare - se_richness_rare, ymax = mean_richness_rare + se_richness_rare), width = 0.1, linewidth = 0.6) +
@@ -173,8 +164,6 @@ dev.off()
 message("Written: ", file.path(dir_out, "Simpson and elevation.png"))
 
 # Figure: Rarefied Shannon vs elevation
-aov_shannon_rare <- summary(aov(insect_shannon_rare ~ elevation, data = hoya_data))[[1]]
-ann_shannon_rare <- pval_annot(aov_shannon_rare["elevation", "Pr(>F)"])
 p_shannon_rare <- ggplot(hoya_summary, aes(x = factor(elevation), y = mean_shannon_rare, fill = factor(elevation))) +
   geom_col() +
   geom_errorbar(aes(ymin = mean_shannon_rare - se_shannon_rare, ymax = mean_shannon_rare + se_shannon_rare), width = 0.1, linewidth = 0.6) +
@@ -182,15 +171,13 @@ p_shannon_rare <- ggplot(hoya_summary, aes(x = factor(elevation), y = mean_shann
   scale_x_discrete(labels = stagger_x) +
   labs(x = "Elevation (m)", y = "Mean rarefied Shannon diversity") +
   base_theme() +
-  annotate("text", x = Inf, y = Inf, label = ann_shannon_rare$label, hjust = 1.1, vjust = 1.5, size = 6, fontface = ann_shannon_rare$fontface)
+  annotate("text", x = Inf, y = Inf, label = ann_rare_shan$label, hjust = 1.1, vjust = 1.5, size = 6, fontface = ann_rare_shan$fontface)
 png(file.path(dir_out, "Rarefied_Shannon_and_elevation.png"), width = 12, height = 7.5, units = "in", res = 300, bg = "white")
 print(p_shannon_rare)
 dev.off()
 message("Written: ", file.path(dir_out, "Rarefied_Shannon_and_elevation.png"))
 
 # Figure: Rarefied Simpson vs elevation
-aov_simpson_rare <- summary(aov(insect_simpson_rare ~ elevation, data = hoya_data))[[1]]
-ann_simpson_rare <- pval_annot(aov_simpson_rare["elevation", "Pr(>F)"])
 p_simpson_rare <- ggplot(hoya_summary, aes(x = factor(elevation), y = mean_simpson_rare, fill = factor(elevation))) +
   geom_col() +
   geom_errorbar(aes(ymin = mean_simpson_rare - se_simpson_rare, ymax = mean_simpson_rare + se_simpson_rare), width = 0.1, linewidth = 0.6) +
@@ -198,7 +185,7 @@ p_simpson_rare <- ggplot(hoya_summary, aes(x = factor(elevation), y = mean_simps
   scale_x_discrete(labels = stagger_x) +
   labs(x = "Elevation (m)", y = "Mean rarefied Simpson diversity") +
   base_theme() +
-  annotate("text", x = Inf, y = Inf, label = ann_simpson_rare$label, hjust = 1.1, vjust = 1.5, size = 6, fontface = ann_simpson_rare$fontface)
+  annotate("text", x = Inf, y = Inf, label = ann_rare_sim$label, hjust = 1.1, vjust = 1.5, size = 6, fontface = ann_rare_sim$fontface)
 png(file.path(dir_out, "Rarefied_Simpson_and_elevation.png"), width = 12, height = 7.5, units = "in", res = 300, bg = "white")
 print(p_simpson_rare)
 dev.off()

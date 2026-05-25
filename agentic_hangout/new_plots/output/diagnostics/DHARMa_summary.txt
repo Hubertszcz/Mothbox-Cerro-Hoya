@@ -1,0 +1,10 @@
+DHARMa residual checks for elevation GLMM/LMM (site-night data, 1416 m excluded).
+Tests: Uniformity (QQ/KS) = overall distribution; Dispersion = variance vs simulation;
+Outliers = count of points outside simulated 95% interval.
+
+Detections (insect_activity) | Uniformity (KS) | p = 0.777 | no significant deviation
+Detections (insect_activity) | Dispersion | p = 0.32 | no significant deviation
+Richness (insect_richness) | Uniformity (KS) | p = 0.398 | no significant deviation
+Richness (insect_richness) | Dispersion | p = 0.368 | no significant deviation
+Shannon (insect_shannon) | Uniformity (KS) | p = 0.929 | no significant deviation
+Shannon (insect_shannon) | Dispersion | p = 0.968 | no significant deviation

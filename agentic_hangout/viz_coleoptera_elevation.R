@@ -99,11 +99,14 @@ pval_annot <- function(pval) {
   list(label = label, fontface = if (!is.na(pval) && pval < 0.05) "bold" else "plain")
 }
 
-# Helper to save one elevation bar plot (with ANOVA p-value)
-save_elev_plot <- function(summary_df, data_df, response_var, y_var, se_var, y_lab, filename) {
-  aov_fit <- aov(as.formula(paste(response_var, "~ elevation")), data = data_df)
-  pval <- summary(aov_fit)[[1]]["elevation", "Pr(>F)"]
-  ann <- pval_annot(pval)
+source("agentic_hangout/elevation_glmm/R/stats_annotations.R")
+annot_df <- read_plot_annotations()
+
+# Helper to save one elevation bar plot (GLMM/LMM p-value from statistics CSV)
+save_elev_plot <- function(summary_df, data_df, response_var, y_var, se_var, y_lab, filename, annot_test = NULL) {
+  if (is.null(annot_test)) annot_test <- paste0(gsub("^insect_", "", response_var), "_elevation")
+  if (annot_test == "activity_elevation") annot_test <- "activity_per_photo_elevation"
+  ann <- get_plot_annot(annot_test, annot_df)
   p <- ggplot(summary_df, aes(x = factor(elevation), y = .data[[y_var]], fill = factor(elevation))) +
     geom_col() +
     geom_errorbar(
@@ -123,17 +126,22 @@ save_elev_plot <- function(summary_df, data_df, response_var, y_var, se_var, y_l
 
 # Raw figures (four)
 save_elev_plot(hoya_summary, hoya_data, "activity", "mean_activity", "se_activity",
-               "Coleoptera total detections", "Coleoptera_detections_elevation.png")
+               "Coleoptera total detections", "Coleoptera_detections_elevation.png",
+               annot_test = "coleoptera_activity_elevation")
 save_elev_plot(hoya_summary, hoya_data, "richness", "mean_richness", "se_richness",
-               "Coleoptera mean richness", "Coleoptera_richness_elevation.png")
+               "Coleoptera mean richness", "Coleoptera_richness_elevation.png",
+               annot_test = "coleoptera_richness_elevation")
 save_elev_plot(hoya_summary, hoya_data, "shannon", "mean_shannon", "se_shannon",
-               "Coleoptera mean Shannon diversity", "Coleoptera_Shannon_elevation.png")
+               "Coleoptera mean Shannon diversity", "Coleoptera_Shannon_elevation.png",
+               annot_test = "coleoptera_shannon_elevation")
 save_elev_plot(hoya_summary, hoya_data, "simpson", "mean_simpson", "se_simpson",
-               "Coleoptera mean Simpson diversity", "Coleoptera_Simpson_elevation.png")
+               "Coleoptera mean Simpson diversity", "Coleoptera_Simpson_elevation.png",
+               annot_test = "coleoptera_simpson_elevation")
 
 # Effort-corrected and rarefied figures (four)
 save_elev_plot(hoya_summary, hoya_data, "activity_per_photo", "mean_activity_per_photo", "se_activity_per_photo",
-               "Coleoptera detections per photo", "Coleoptera_detections_per_photo_elevation.png")
+               "Coleoptera detections per photo", "Coleoptera_detections_per_photo_elevation.png",
+               annot_test = "coleoptera_activity_per_photo_elevation")
 save_elev_plot(hoya_summary, hoya_data, "richness_rare", "mean_richness_rare", "se_richness_rare",
                "Coleoptera mean rarefied richness", "Coleoptera_rarefied_richness_elevation.png")
 save_elev_plot(hoya_summary, hoya_data, "shannon_rare", "mean_shannon_rare", "se_shannon_rare",
