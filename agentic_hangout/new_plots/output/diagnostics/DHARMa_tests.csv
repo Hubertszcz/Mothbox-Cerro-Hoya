@@ -1,7 +1,0 @@
-"response","test","statistic","p_value","interpretation","family"
-"Detections (insect_activity)","Uniformity (KS)",0.0961851892956988,0.777291508911893,"no significant deviation","Negative binomial GLMM"
-"Detections (insect_activity)","Dispersion",0.502322323895192,0.32,"no significant deviation","Negative binomial GLMM"
-"Richness (insect_richness)","Uniformity (KS)",0.127286240705348,0.398209499942726,"no significant deviation","Poisson GLMM"
-"Richness (insect_richness)","Dispersion",0.782778852302514,0.368,"no significant deviation","Poisson GLMM"
-"Shannon (insect_shannon)","Uniformity (KS)",0.0792340425531915,0.929480361363683,"no significant deviation","Gaussian LMM"
-"Shannon (insect_shannon)","Dispersion",0.969573184560003,0.968,"no significant deviation","Gaussian LMM"

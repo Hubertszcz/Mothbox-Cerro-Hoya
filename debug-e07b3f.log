@@ -1,4 +1,0 @@
-{"sessionId":"e07b3f","hypothesisId":"A","location":"0-data_cleanup.R","message":"genus column type and NA count","data":{"genus_class":"character","genus_na_count":79876,"nrow":81818,"ncol":32},"timestamp":1773196971591}
-{"sessionId":"e07b3f","hypothesisId":"A","location":"0-data_cleanup.R","message":"genus for Diabrotica name rows","data":{"n_diabrotica":675,"genus_val_1":"NA","genus_val_2":"Diabrotica"},"timestamp":1773196975505}
-{"sessionId":"e07b3f","hypothesisId":"D","location":"0-data_cleanup.R","message":"first file in list (type guessing source)","data":{"first_file":"Cerro_Hoya_Expedition_1004m_Hoya_1004m_accionSauro_2025-01-26_2025-01-26_exported-2026-03_03.csv"},"timestamp":1773196976899}
-{"sessionId":"e07b3f","hypothesisId":"A","location":"0-data_cleanup.R","message":"unique genus sample","data":{"n_unique_genus":51,"first_3":"Forcipomyia;Gonomyia;Neobrotica"},"timestamp":1773196989908}

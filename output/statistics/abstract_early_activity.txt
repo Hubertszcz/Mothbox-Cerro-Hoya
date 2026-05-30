@@ -1,0 +1,4 @@
+Manuscript Abstract — early evening activity
+40.1% of insect detections occurred in the first sampling session (19:00–20:00; within ~1.5 h of sunset at 18:30).
+
+n_first_session = 25694; n_insect_detections = 64137; pct = 40.1

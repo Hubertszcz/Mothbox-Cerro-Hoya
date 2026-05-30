@@ -401,7 +401,9 @@ dev.off()
 library(glmmTMB)
 library(lme4)
 library(lmerTest)
-source("agentic_hangout/new_plots/R/elevation_model_helpers.R")
+options(mothbox.elevation.helpers.only = TRUE)
+source("code/3-statistics.R")
+options(mothbox.elevation.helpers.only = NULL)
 
 elev_axis_breaks <- seq(200, 1400, by = 200)
 

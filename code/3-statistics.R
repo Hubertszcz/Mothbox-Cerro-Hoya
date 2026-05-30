@@ -1,11 +1,111 @@
 ###########################################################################################################################
-# Statistics: elevation and session effects (manuscript Methods)
-#   Fig 1 — activity per photo ~ elevation
-#   Fig 2 — richness ~ elevation
-#   Fig 3 — Shannon ~ elevation
-#   Fig 4 — session, elevation, interaction (focal orders; panels use elevation bands for display only)
-# Methods paragraph: agentic_hangout/elevation_glmm/STATISTICS_METHODS.md
+# Statistics: elevation and session effects (manuscript Methods / Results)
+#   Paper Fig 2 — detections per photo, richness, Shannon ~ elevation (Tests 1–3; DHARMa)
+#   Paper Fig 3 — activity by order and hour (descriptive; plotted in 2-visualization.R)
+#   Paper Fig 4 — activity by session across elevations (Fig 6 support CSVs below)
+#   Paper Fig 5 — session x elevation bands x order (Tests 5–6; caption stats from Test 6)
+#   Abstract — ~40% detections in first session after sunset (19h window; see end of script)
+# Helpers at top are sourced by code/2-visualization.R for continuous elevation plots (paper Fig 2).
 ###########################################################################################################################
+
+###########################################################################################################################
+# Elevation GLMM/LMM helpers (paper Fig 2; code/2-visualization.R continuous plots)
+#   fit_count_glmm / fit_shannon_lmm — same models as Tests 1–3
+#   predict_* — population-level trend lines for figures
+###########################################################################################################################
+
+suppressPackageStartupMessages({
+  library(glmmTMB)
+  library(lme4)
+})
+
+fit_count_glmm <- function(df, count_col, use_offset = TRUE) {
+  if (use_offset) {
+    fml <- as.formula(paste(count_col, "~ elevation_n + offset(log_offset) + (1 | site)"))
+  } else {
+    fml <- as.formula(paste(count_col, "~ elevation_n + (1 | site)"))
+  }
+  m_pois <- tryCatch(glmmTMB::glmmTMB(fml, data = df, family = poisson), error = function(e) NULL)
+  m_nb <- tryCatch(glmmTMB::glmmTMB(fml, data = df, family = nbinom2), error = function(e) NULL)
+  if (is.null(m_pois) && is.null(m_nb)) {
+    return(list(model = NULL, family = NA_character_))
+  }
+  if (!is.null(m_nb) && !is.null(m_pois) && AIC(m_nb) + 2 < AIC(m_pois)) {
+    list(model = m_nb, family = "Negative binomial GLMM")
+  } else {
+    list(model = m_pois, family = "Poisson GLMM")
+  }
+}
+
+fit_shannon_lmm <- function(df) {
+  m <- lme4::lmer(insect_shannon ~ elevation_n + (1 | site), data = df, REML = TRUE)
+  list(model = m, family = "Gaussian LMM")
+}
+
+predict_count_glmm <- function(fit, df, n_grid = 100, to_rate = FALSE) {
+  m <- fit$model
+  if (is.null(m)) return(NULL)
+  elev_seq <- seq(min(df$elevation_n, na.rm = TRUE), max(df$elevation_n, na.rm = TRUE), length.out = n_grid)
+  mean_log_off <- mean(df$log_offset, na.rm = TRUE)
+  has_offset <- "log_offset" %in% all.vars(formula(m))
+  newdata <- data.frame(elevation_n = elev_seq)
+  if (has_offset) newdata$log_offset <- mean_log_off
+
+  pred <- tryCatch(
+    predict(m, newdata = newdata, type = "response", se.fit = TRUE, re.form = NA),
+    error = function(e) NULL
+  )
+  if (is.null(pred)) {
+    fit_vals <- predict(m, newdata = newdata, type = "response", re.form = NA)
+    out <- data.frame(elevation_n = elev_seq, fit = as.numeric(fit_vals))
+    if (to_rate && has_offset) out$fit <- out$fit / exp(mean_log_off)
+    return(out)
+  }
+
+  fit_vals <- as.numeric(pred$fit)
+  if (to_rate && has_offset) fit_vals <- fit_vals / exp(mean_log_off)
+  se <- as.numeric(pred$se.fit)
+  if (to_rate && has_offset) se <- se / exp(mean_log_off)
+
+  data.frame(
+    elevation_n = elev_seq,
+    fit = fit_vals,
+    ymin = pmax(fit_vals - 1.96 * se, 0),
+    ymax = fit_vals + 1.96 * se,
+    has_ribbon = TRUE
+  )
+}
+
+predict_shannon_lmm <- function(fit, df, n_grid = 100) {
+  m <- fit$model
+  if (is.null(m)) return(NULL)
+  elev_seq <- seq(min(df$elevation_n, na.rm = TRUE), max(df$elevation_n, na.rm = TRUE), length.out = n_grid)
+  newdata <- data.frame(elevation_n = elev_seq)
+  pred <- predict(m, newdata = newdata, re.form = NA, se.fit = TRUE)
+  fit_vals <- as.numeric(pred$fit)
+  se <- as.numeric(pred$se.fit)
+  data.frame(
+    elevation_n = elev_seq,
+    fit = fit_vals,
+    ymin = fit_vals - 1.96 * se,
+    ymax = fit_vals + 1.96 * se,
+    has_ribbon = TRUE
+  )
+}
+
+base_theme_elevation <- function() {
+  ggplot2::theme_minimal(base_family = "Arial", base_size = 18) +
+    ggplot2::theme(
+      axis.title = ggplot2::element_text(size = 30),
+      axis.text  = ggplot2::element_text(size = 20),
+      legend.position = "none",
+      panel.grid.minor.x = ggplot2::element_blank()
+    )
+}
+
+if (isTRUE(getOption("mothbox.elevation.helpers.only", FALSE))) {
+  invisible(TRUE)
+} else {
 
 #load packages
 library(dplyr)
@@ -58,9 +158,8 @@ session_effort <- session_effort %>%
 
 focal_orders <- c("Lepidoptera", "Coleoptera", "Hemiptera", "Diptera")
 
-dir_out <- "agentic_hangout/elevation_glmm/output"
+dir_out <- "output/statistics"
 dir.create(dir_out, showWarnings = FALSE, recursive = TRUE)
-dir.create("agentic_hangout/output", showWarnings = FALSE, recursive = TRUE)
 # Significance threshold (matches Methods: assessed at alpha = 0.05).
 alpha <- 0.05
 
@@ -183,7 +282,7 @@ sig_word <- function(p) {
 
 
 ###########################################################################################################################
-# Test 1: Mean detections per photo ~ elevation (Figure 1)
+# Test 1: Mean detections per photo ~ elevation (paper Fig 2a; Results p < 0.05)
 #   GLMM with log(n_photos) offset; report direction of elevation slope.
 ###########################################################################################################################
 
@@ -193,7 +292,7 @@ result_1 <- elev_statement("Mean detections per photo", s1$est, p1)
 
 
 ###########################################################################################################################
-# Test 2: Morphospecies richness ~ elevation (Figure 2)
+# Test 2: Morphospecies richness ~ elevation (paper Fig 2b; Results p < 0.05)
 ###########################################################################################################################
 
 s2 <- elev_slope(hoya_glmm, count_col = "insect_richness")
@@ -202,7 +301,7 @@ result_2 <- elev_statement("Morphospecies richness", s2$est, p2)
 
 
 ###########################################################################################################################
-# Test 3: Shannon diversity ~ elevation (Figure 3)
+# Test 3: Shannon diversity ~ elevation (paper Fig 2c; Results p < 0.05)
 #   Gaussian LMM (Shannon is continuous, not a count).
 ###########################################################################################################################
 
@@ -229,7 +328,7 @@ for (ord in focal_orders) {
 
 
 ###########################################################################################################################
-# Test 5: Does sampling session (hour) predict detections per photo? (Figure 4 — session main effect)
+# Test 5: Does sampling session (hour) predict detections per photo? (paper Fig 5 / session main effect)
 #   Nested LMMs; likelihood-ratio test for adding hour (Methods).
 ###########################################################################################################################
 
@@ -251,7 +350,7 @@ for (ord in focal_orders) {
 
 
 ###########################################################################################################################
-# Test 6: Session x elevation on detections per photo (Figure 4 caption statistics)
+# Test 6: Session x elevation on detections per photo (paper Fig 5 caption / Discussion)
 #   Continuous elevation_n (not elevation_band); random effects: site + site_night.
 #   hour: omnibus F (anova); elevation_n: slope t-test; interaction: F-test.
 ###########################################################################################################################
@@ -276,7 +375,7 @@ for (ord in focal_orders) {
   )
 }
 
-# Draft sentences for Figure 4 caption (focal orders only; left "All orders" panel is descriptive).
+# Draft sentences for paper Fig 5 caption (Test 6; focal orders only; "All orders" panel is descriptive).
 fig4_caption_parts <- vapply(focal_orders, function(ord) {
   p <- test6_p[[ord]]
   sprintf(
@@ -336,13 +435,12 @@ cat("\nPer order (session):\n")
 for (ord in focal_orders) cat("  ", result_5[ord], "\n")
 cat("\nPer order (session x elevation):\n")
 for (ord in focal_orders) cat("  ", result_6[ord], "\n")
-cat("\n--- Figure 4 caption draft (Test 6) ---\n")
+cat("\n--- Paper Fig 5 caption draft (Test 6) ---\n")
 cat(fig4_caption_text, "\n")
 cat("\n================================================================\n")
 
 write.csv(results_df, file.path(dir_out, "statistics_one_line_results.csv"), row.names = FALSE)
 write.csv(results_df, file.path(dir_out, "results_summary.csv"), row.names = FALSE)
-write.csv(results_df, "agentic_hangout/output/statistics_one_line_results.csv", row.names = FALSE)
 write.csv(families_df, file.path(dir_out, "model_families.csv"), row.names = FALSE)
 writeLines(fig4_caption_text, file.path(dir_out, "figure4_caption_stats_draft.txt"))
 
@@ -377,7 +475,7 @@ write.csv(plot_annot, file.path(dir_out, "statistics_plot_annotations.csv"), row
 ##################################
 
 ###########################################################################################################################
-# Figure 6 support: all-insect session rates and hour LMM predictions (2-visualization.R overlay)
+# Figure 6 support: all-insect session rates and hour LMM predictions (paper Fig 4; 2-visualization.R overlay)
 #   Not part of Tests 1–6; supplies data_processed CSVs for the hour x elevation factor plot.
 ###########################################################################################################################
 
@@ -433,6 +531,138 @@ write.csv(pred_fig6_hour, "data_processed/activity_by_hour_lmm_predictions.csv",
 ##################################
 ##################################
 
+###########################################################################################################################
+# DHARMa residual diagnostics (Methods: assumption checks for Tests 1–3 / paper Fig 2 models)
+#   Writes output/statistics/diagnostics/ (plots, DHARMa_tests.csv, DHARMa_summary.txt)
+###########################################################################################################################
+
+fit_rate_dharma <- fit_count_glmm(fig1_data, "insect_activity", use_offset = TRUE)
+fit_rich_dharma <- fit_count_glmm(hoya_glmm, "insect_richness", use_offset = TRUE)
+fit_shan_dharma <- fit_shannon_lmm(hoya_glmm)
+
+if (!requireNamespace("DHARMa", quietly = TRUE)) {
+  warning("Install DHARMa for residual diagnostics: install.packages('DHARMa')")
+} else {
+  dir_diag <- file.path(dir_out, "diagnostics")
+  dir.create(dir_diag, showWarnings = FALSE, recursive = TRUE)
+
+  dharma_test_row <- function(test_obj, test_name, response) {
+    data.frame(
+      response = response,
+      test = test_name,
+      statistic = unname(test_obj$statistic),
+      p_value = test_obj$p.value,
+      interpretation = if (test_obj$p.value < 0.05) "significant deviation (p < 0.05)" else "no significant deviation",
+      stringsAsFactors = FALSE
+    )
+  }
+
+  run_dharma_diagnostics <- function(model, response_label, family_label, outfile_stub) {
+    sim <- DHARMa::simulateResiduals(model, plot = FALSE, n = 250)
+
+    png(
+      file.path(dir_diag, paste0(outfile_stub, "_DHARMa.png")),
+      width = 10, height = 8, units = "in", res = 150, bg = "white"
+    )
+    plot(sim)
+    dev.off()
+
+    tests <- list(
+      uniformity = DHARMa::testUniformity(sim, plot = FALSE),
+      dispersion = DHARMa::testDispersion(sim, plot = FALSE),
+      outliers   = DHARMa::testOutliers(sim, plot = FALSE)
+    )
+
+    rows <- bind_rows(
+      dharma_test_row(tests$uniformity, "Uniformity (KS)", response_label),
+      dharma_test_row(tests$dispersion, "Dispersion", response_label)
+    )
+
+    out <- tests$outliers
+    if (!is.null(out$observedOutliers) && length(out$observedOutliers) > 0) {
+      out_p <- if (!is.null(out$p.value) && length(out$p.value) > 0) unname(out$p.value)[1] else NA_real_
+      rows <- bind_rows(
+        rows,
+        data.frame(
+          response = response_label,
+          test = "Outliers",
+          statistic = as.numeric(out$observedOutliers)[1],
+          p_value = out_p,
+          interpretation = sprintf(
+            "%s outliers observed (%s expected at 95%% simulation interval)",
+            out$observedOutliers[1],
+            format(out$expectedOutliers[1], digits = 3)
+          ),
+          stringsAsFactors = FALSE
+        )
+      )
+    }
+    rows$family <- family_label
+    rows
+  }
+
+  dharma_results <- bind_rows(
+    run_dharma_diagnostics(
+      fit_rate_dharma$model, "Detections (insect_activity)",
+      fit_rate_dharma$family, "detections"
+    ),
+    run_dharma_diagnostics(
+      fit_rich_dharma$model, "Richness (insect_richness)",
+      fit_rich_dharma$family, "richness"
+    ),
+    run_dharma_diagnostics(
+      fit_shan_dharma$model, "Shannon (insect_shannon)",
+      fit_shan_dharma$family, "shannon"
+    )
+  )
+
+  write.csv(dharma_results, file.path(dir_diag, "DHARMa_tests.csv"), row.names = FALSE)
+
+  summary_lines <- c(
+    "DHARMa residual checks for elevation GLMM/LMM (site-night data, 1416 m excluded).",
+    "Tests: Uniformity (QQ/KS) = overall distribution; Dispersion = variance vs simulation;",
+    "Outliers = count of points outside simulated 95% interval.",
+    "",
+    apply(dharma_results, 1, function(r) {
+      sprintf("%s | %s | p = %s | %s", r["response"], r["test"], format.pval(as.numeric(r["p_value"]), digits = 3), r["interpretation"])
+    })
+  )
+  writeLines(summary_lines, file.path(dir_diag, "DHARMa_summary.txt"))
+}
+
+###########################################################################################################################
+# Abstract early-activity stat (Abstract: ~40% detections within 1.5 h of sunset)
+#   First Program A session (19h) vs all sessions; sunset 18:30 → 19:00–20:00 ≈ 1.5 h window
+#   Writes output/statistics/abstract_early_activity.txt
+###########################################################################################################################
+
+n_insect_detections <- nrow(data)
+n_first_session <- sum(data$hour == "19h", na.rm = TRUE)
+pct_first_session <- round(100 * n_first_session / n_insect_detections, 1)
+abstract_early_line <- sprintf(
+  "%s%% of insect detections occurred in the first sampling session (19:00–20:00; within ~1.5 h of sunset at 18:30).",
+  pct_first_session
+)
+
+cat("\n--- Abstract early-activity (paper Abstract) ---\n")
+cat(abstract_early_line, "\n")
+
+writeLines(
+  c(
+    "Manuscript Abstract — early evening activity",
+    abstract_early_line,
+    "",
+    sprintf("n_first_session = %s; n_insect_detections = %s; pct = %s", n_first_session, n_insect_detections, pct_first_session)
+  ),
+  file.path(dir_out, "abstract_early_activity.txt")
+)
+
+##################################
+##################################
+####### NEW ######################
+##################################
+##################################
+
 
 ###########################################################################################################################
 ### OLD: categorical ANOVA (replaced by continuous GLMM/LMM above)
@@ -444,3 +674,5 @@ write.csv(pred_fig6_hour, "data_processed/activity_by_hour_lmm_predictions.csv",
 # m4 <- lm(rate ~ factor(elevation), data = df4)
 # m5 <- lm(rate ~ hour, data = df5)
 # m6 <- lm(rate ~ hour * elevation_band, data = df6)
+
+} # end !mothbox.elevation.helpers.only

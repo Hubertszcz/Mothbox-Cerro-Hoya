@@ -1,8 +1,0 @@
-"test","family"
-"1_mean_detections_per_photo_elevation","nbinom2"
-"2_richness_elevation","poisson"
-"3_shannon_elevation","gaussian"
-"4_order_Lepidoptera_elevation","nbinom2"
-"4_order_Coleoptera_elevation","nbinom2"
-"4_order_Hemiptera_elevation","nbinom2"
-"4_order_Diptera_elevation","nbinom2"
